@@ -99,7 +99,7 @@ function BrandModal({ brand, onClose, onSave }: {
                             />
                             {(key === 'logoUrl' || key === 'qrCodeUrl') && (
                                 <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '8px', fontStyle: 'italic' }}>
-                                    💡 <strong>Mẹo:</strong> Tải ảnh lên <a href="https://imgbb.com/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-orange)', textDecoration: 'none', fontWeight: 600 }}>imgbb.com</a> để lấy link gốc (.png, .jpg) dán vào đây.
+                                    💡 <strong>Mẹo:</strong> Tải ảnh lên <a href="https://imgbb.com/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-orange)', textDecoration: 'none', fontWeight: 600 }}>imgbb.com</a>. Bạn <strong>bắt buộc phải lấy Direct Link (Liên kết trực tiếp)</strong> có đuôi <code style={{ color: 'var(--accent-red)' }}>.png</code> hoặc <code style={{ color: 'var(--accent-red)' }}>.jpg</code> (Ví dụ: https://i.ibb.co/xyz/anh.png). Không dùng link trang web.
                                 </div>
                             )}
                         </div>
@@ -262,21 +262,37 @@ export default function BrandsPage() {
                         <div key={brand.id} className="card" style={{ padding: '20px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                    <div style={{
-                                        width: '44px',
-                                        height: '44px',
-                                        borderRadius: '10px',
-                                        background: brand.color,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '18px',
-                                        fontWeight: 800,
-                                        color: 'white',
-                                        boxShadow: `0 4px 12px ${brand.color}44`,
-                                    }}>
-                                        {brand.name[0]}
-                                    </div>
+                                    {brand.logoUrl ? (
+                                        <div style={{
+                                            width: '44px',
+                                            height: '44px',
+                                            borderRadius: '10px',
+                                            background: '#fff',
+                                            border: '1px solid var(--border-light)',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            padding: '4px'
+                                        }}>
+                                            <img src={brand.logoUrl} alt={brand.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                                        </div>
+                                    ) : (
+                                        <div style={{
+                                            width: '44px',
+                                            height: '44px',
+                                            borderRadius: '10px',
+                                            background: brand.color,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            fontSize: '18px',
+                                            fontWeight: 800,
+                                            color: 'white',
+                                            boxShadow: `0 4px 12px ${brand.color}44`,
+                                        }}>
+                                            {brand.name[0]}
+                                        </div>
+                                    )}
                                     <div>
                                         <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>{brand.name}</div>
                                         <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>ID: {brand.id}</div>
