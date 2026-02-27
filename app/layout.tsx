@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import Sidebar from '@/components/layout/Sidebar';
+import AppLayoutWrapper from '@/components/layout/AppLayoutWrapper';
 
 export const metadata: Metadata = {
-  title: 'LabelCheck — Hệ thống Kiểm tra Nhãn Mỹ phẩm',
-  description: 'Tự động kiểm tra nhãn mỹ phẩm và mã vạch theo quy định pháp luật',
+  title: 'LabelCheck AI — Hệ thống Kiểm tra Nhãn Mỹ phẩm',
+  description: 'Tự động kiểm tra nhãn mỹ phẩm và mã vạch theo quy định pháp luật. Tiết kiệm 80% thời gian duyệt, đảm bảo an toàn 100%.',
 };
 
 export default function RootLayout({
@@ -15,16 +15,9 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body>
-        <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-          <Sidebar />
-          <main style={{
-            flex: 1,
-            overflow: 'auto',
-            background: 'var(--bg-primary)',
-          }}>
-            {children}
-          </main>
-        </div>
+        <AppLayoutWrapper>
+          {children}
+        </AppLayoutWrapper>
       </body>
     </html>
   );

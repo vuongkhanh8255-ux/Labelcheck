@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-    { href: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { href: '/check', icon: Plus, label: 'Check Mới' },
     { href: '/brands', icon: Building2, label: 'Brands' },
 ];
@@ -41,7 +41,7 @@ export default function Sidebar() {
                         width: '36px',
                         height: '36px',
                         borderRadius: '10px',
-                        background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
+                        background: 'linear-gradient(135deg, #F97316, #EA580C)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -49,8 +49,8 @@ export default function Sidebar() {
                         <ShieldCheck size={20} color="white" />
                     </div>
                     <div>
-                        <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                            LabelCheck
+                        <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)' }}>
+                            LabelCheck <span style={{ color: 'var(--accent-orange)' }}>AI</span>
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '1px' }}>
                             v1.0 — QA System
@@ -65,7 +65,7 @@ export default function Sidebar() {
                     Chức năng
                 </div>
                 {navItems.map(({ href, icon: Icon, label }) => {
-                    const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
+                    const isActive = pathname === href || pathname.startsWith(href + '/');
                     return (
                         <Link
                             key={href}
@@ -79,9 +79,9 @@ export default function Sidebar() {
                                 marginBottom: '2px',
                                 textDecoration: 'none',
                                 fontSize: '14px',
-                                fontWeight: isActive ? 600 : 400,
-                                color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
-                                background: isActive ? 'var(--accent-blue-glow)' : 'transparent',
+                                fontWeight: isActive ? 600 : 500,
+                                color: isActive ? 'var(--accent-orange)' : 'var(--text-secondary)',
+                                background: isActive ? 'var(--accent-orange-glow)' : 'transparent',
                                 transition: 'all 0.15s ease',
                             }}
                         >
@@ -97,7 +97,7 @@ export default function Sidebar() {
                     Thống kê
                 </div>
                 <Link
-                    href="/"
+                    href="/dashboard"
                     style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -131,7 +131,7 @@ export default function Sidebar() {
                         width: '28px',
                         height: '28px',
                         borderRadius: '50%',
-                        background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
+                        background: 'linear-gradient(135deg, #F97316, #EA580C)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',

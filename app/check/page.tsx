@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { MOCK_BRANDS } from '@/lib/mock-data';
-import { CheckFormData, LabelType } from '@/types';
+import { supabase } from '@/lib/supabase';
+import { Brand, CheckFormData, LabelType } from '@/types';
 import { formatVolumeLabel } from '@/lib/unit-converter';
 import { ChevronRight, ChevronLeft, Upload, X, Check, Package, Building2, FileText, Barcode } from 'lucide-react';
 
@@ -20,8 +20,7 @@ function StepIndicator({ current }: { current: number }) {
                         </div>
                         <span style={{
                             fontSize: '11px',
-                            fontWeight: i === current ? 600 : 400,
-                            color: i === current ? 'var(--accent-blue)' : i < current ? 'var(--accent-green)' : 'var(--text-muted)',
+                            color: i === current ? 'var(--accent-orange)' : i < current ? 'var(--accent-green)' : 'var(--text-muted)',
                             whiteSpace: 'nowrap',
                         }}>
                             {label}
@@ -119,8 +118,31 @@ export default function CheckPage() {
         hscbFile: null,
         barcodeFile: null,
     });
+    const [brands, setBrands] = useState<Brand[]>([]);
+    const [loadingBrands, setLoadingBrands] = useState(true);
 
-    const selectedBrand = MOCK_BRANDS.find(b => b.id === form.brandId);
+    useEffect(() => {
+        const fetchBrands = async () => {
+            const { data, error } = await supabase.from('brands').select('*');
+            if (data) {
+                setBrands(data.map(item => ({
+                    id: item.id,
+                    name: item.name,
+                    logoUrl: item.logo_url || '',
+                    qrCodeUrl: item.qr_code_url || '',
+                    registeredCompanyName: item.registered_company_name,
+                    address: item.address || '',
+                    phone: item.phone || '',
+                    website: item.website || '',
+                    color: item.color || '#EA580C',
+                })));
+            }
+            setLoadingBrands(false);
+        };
+        fetchBrands();
+    }, []);
+
+    const selectedBrand = brands.find(b => b.id === form.brandId);
     const volumeFormatted = form.volume ? formatVolumeLabel(form.volume, form.unit) : '';
 
     const canNext = () => {
@@ -166,15 +188,15 @@ export default function CheckPage() {
                                         padding: '28px 24px',
                                         borderRadius: '12px',
                                         border: '2px solid',
-                                        borderColor: form.labelType === type ? 'var(--accent-blue)' : 'var(--border)',
-                                        background: form.labelType === type ? 'var(--accent-blue-glow)' : 'var(--bg-card)',
+                                        borderColor: form.labelType === type ? 'var(--accent-orange)' : 'var(--border)',
+                                        background: form.labelType === type ? 'var(--accent-orange-glow)' : 'var(--bg-card)',
                                         cursor: 'pointer',
                                         textAlign: 'left',
                                         transition: 'all 0.2s ease',
                                     }}
                                 >
-                                    <Package size={28} color={form.labelType === type ? 'var(--accent-blue)' : 'var(--text-muted)'} />
-                                    <div style={{ fontSize: '20px', fontWeight: 800, color: form.labelType === type ? 'var(--accent-blue)' : 'var(--text-primary)', marginTop: '12px' }}>
+                                    <Package size={28} color={form.labelType === type ? 'var(--accent-orange)' : 'var(--text-muted)'} />
+                                    <div style={{ fontSize: '20px', fontWeight: 800, color: form.labelType === type ? 'var(--accent-orange)' : 'var(--text-primary)', marginTop: '12px' }}>
                                         {type}
                                     </div>
                                     <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '6px' }}>
@@ -209,7 +231,9 @@ export default function CheckPage() {
                             Hệ thống sẽ tự động load thông tin cố định của brand
                         </p>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                            {MOCK_BRANDS.map(brand => (
+                            {loadingBrands ? (
+                                <div style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Đang tải danh sách thương hiệu...</div>
+                            ) : brands.map(brand => (
                                 <button
                                     key={brand.id}
                                     onClick={() => setForm(f => ({ ...f, brandId: brand.id }))}
@@ -242,8 +266,8 @@ export default function CheckPage() {
                                         <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>{brand.name}</span>
                                     </div>
                                     <div style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                                        <div>{brand.companyName}</div>
-                                        <div style={{ color: 'var(--accent-blue)', marginTop: '2px' }}>{brand.website}</div>
+                                        <div>{brand.registeredCompanyName}</div>
+                                        <div style={{ color: 'var(--accent-orange)', marginTop: '2px' }}>{brand.website || <span style={{ opacity: 0.5 }}>Chưa cập nhật website</span>}</div>
                                     </div>
                                 </button>
                             ))}
@@ -262,7 +286,9 @@ export default function CheckPage() {
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                                     {[
-                                        ['Công ty', selectedBrand.companyName],
+                                        ['Công ty', selectedBrand.registeredCompanyName],
+                                        ['Logo', selectedBrand.logoUrl ? 'Đã có (' + selectedBrand.logoUrl + ')' : 'Chưa có'],
+                                        ['Mã QR', selectedBrand.qrCodeUrl ? 'Đã có (' + selectedBrand.qrCodeUrl + ')' : 'Chưa có'],
                                         ['Địa chỉ', selectedBrand.address],
                                         ['SĐT', selectedBrand.phone],
                                         ['Website', selectedBrand.website],
@@ -429,11 +455,11 @@ export default function CheckPage() {
                         <div style={{
                             marginTop: '20px',
                             padding: '14px 16px',
-                            background: 'var(--accent-blue-glow)',
+                            background: 'var(--accent-orange-glow)',
                             borderRadius: '10px',
-                            border: '1px solid rgba(59, 130, 246, 0.3)',
+                            border: '1px solid rgba(234, 88, 12, 0.3)',
                             fontSize: '13px',
-                            color: 'var(--accent-blue)',
+                            color: 'var(--accent-orange)',
                         }}>
                             🤖 Hệ thống sẽ sử dụng AI (OCR + Image Processing) để phân tích nhãn và trả kết quả trong vài giây.
                         </div>
@@ -471,14 +497,14 @@ export default function CheckPage() {
                                 alignItems: 'center',
                                 gap: '6px',
                                 padding: '10px 24px',
-                                background: canNext() ? 'linear-gradient(135deg, #3B82F6, #8B5CF6)' : 'var(--border)',
+                                background: canNext() ? 'linear-gradient(135deg, #F97316, #EA580C)' : 'var(--border)',
                                 border: 'none',
                                 borderRadius: '8px',
                                 color: canNext() ? 'white' : 'var(--text-muted)',
                                 fontSize: '14px',
                                 fontWeight: 600,
                                 cursor: canNext() ? 'pointer' : 'not-allowed',
-                                boxShadow: canNext() ? '0 4px 16px rgba(59, 130, 246, 0.3)' : 'none',
+                                boxShadow: canNext() ? '0 4px 16px rgba(234, 88, 12, 0.3)' : 'none',
                                 transition: 'all 0.2s ease',
                             }}
                         >
@@ -492,7 +518,7 @@ export default function CheckPage() {
                                 alignItems: 'center',
                                 gap: '6px',
                                 padding: '10px 28px',
-                                background: 'linear-gradient(135deg, #10B981, #3B82F6)',
+                                background: 'linear-gradient(135deg, #10B981, #F97316)',
                                 border: 'none',
                                 borderRadius: '8px',
                                 color: 'white',

@@ -8,7 +8,8 @@ export interface Brand {
     id: string;
     name: string;
     logoUrl: string;
-    companyName: string;
+    qrCodeUrl: string;
+    registeredCompanyName: string;
     address: string;
     phone: string;
     website: string;

@@ -3,24 +3,28 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #0A0E1A;
-  --bg-secondary: #0F1629;
-  --bg-card: #131929;
-  --bg-card-hover: #1A2235;
-  --border: #1E2D45;
-  --border-light: #243352;
-  --text-primary: #E8EDF5;
-  --text-secondary: #8B9BB4;
-  --text-muted: #4A5568;
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F8FAFC;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F1F5F9;
+  --border: #E2E8F0;
+  --border-light: #CBD5E1;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  
   --accent-blue: #3B82F6;
-  --accent-blue-glow: rgba(59, 130, 246, 0.15);
+  --accent-blue-glow: rgba(59, 130, 246, 0.1);
   --accent-green: #10B981;
-  --accent-green-glow: rgba(16, 185, 129, 0.15);
+  --accent-green-glow: rgba(16, 185, 129, 0.1);
   --accent-red: #EF4444;
-  --accent-red-glow: rgba(239, 68, 68, 0.15);
+  --accent-red-glow: rgba(239, 68, 68, 0.1);
   --accent-yellow: #F59E0B;
-  --accent-yellow-glow: rgba(245, 158, 11, 0.15);
+  --accent-yellow-glow: rgba(245, 158, 11, 0.1);
   --accent-purple: #8B5CF6;
+  
+  --accent-orange: #EA580C;
+  --accent-orange-glow: rgba(234, 88, 12, 0.1);
 }
 
 * {

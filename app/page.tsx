@@ -1,250 +1,279 @@
 'use client';
 
 import Link from 'next/link';
-import { MOCK_SESSIONS, MOCK_BRANDS } from '@/lib/mock-data';
-import { CheckSession } from '@/types';
-import {
-  Plus, CheckCircle2, XCircle, AlertTriangle, Clock,
-  ChevronRight, BarChart3, TrendingUp, Package, Filter
-} from 'lucide-react';
-import { useState } from 'react';
+import { ShieldCheck, ArrowRight, UploadCloud, Shield, BarChart3, Zap, Package } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { MOCK_BRANDS } from '@/lib/mock-data';
 
-function StatusBadge({ status }: { status: CheckSession['status'] }) {
-  const config = {
-    pass: { label: 'PASS', className: 'badge-pass', icon: '✅' },
-    fail: { label: 'FAIL', className: 'badge-fail', icon: '❌' },
-    warning: { label: 'CẢNH BÁO', className: 'badge-warning', icon: '⚠️' },
-    pending: { label: 'ĐANG XỬ LÝ', className: 'badge-pending', icon: '⏳' },
-  };
-  const c = config[status];
-  return (
-    <span className={`badge ${c.className}`}>
-      {c.icon} {c.label}
-    </span>
-  );
-}
+export default function LandingPage() {
+  const [scrolled, setScrolled] = useState(false);
 
-function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub: string; color: string }) {
-  return (
-    <div className="card" style={{ padding: '20px 24px' }}>
-      <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '8px' }}>{label}</div>
-      <div style={{ fontSize: '32px', fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '6px' }}>{sub}</div>
-    </div>
-  );
-}
-
-export default function DashboardPage() {
-  const [filter, setFilter] = useState<'all' | 'pass' | 'fail' | 'warning'>('all');
-
-  const sessions = MOCK_SESSIONS.filter(s => filter === 'all' || s.status === filter);
-  const passCount = MOCK_SESSIONS.filter(s => s.status === 'pass').length;
-  const failCount = MOCK_SESSIONS.filter(s => s.status === 'fail').length;
-  const passRate = Math.round((passCount / MOCK_SESSIONS.length) * 100);
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
-    <div style={{ padding: '32px 40px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
-        <div>
-          <h1 style={{ fontSize: '26px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '6px' }}>
-            Dashboard Kiểm tra Nhãn
-          </h1>
-          <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-            Quản lý và theo dõi tất cả các lần kiểm tra nhãn mỹ phẩm
-          </p>
-        </div>
-        <Link href="/check" style={{ textDecoration: 'none' }}>
-          <button style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '10px 20px',
-            background: 'linear-gradient(135deg, #3B82F6, #8B5CF6)',
-            border: 'none',
-            borderRadius: '10px',
-            color: 'white',
-            fontSize: '14px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            boxShadow: '0 4px 20px rgba(59, 130, 246, 0.3)',
+    <div style={{ minHeight: '100vh', background: '#0a1a12', fontFamily: 'system-ui, sans-serif' }}>
+      {/* Top Banner */}
+      <div style={{
+        background: '#f97316',
+        color: '#ffffff',
+        textAlign: 'center',
+        padding: '8px',
+        fontSize: '13px',
+        fontWeight: 600,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px'
+      }}>
+        <span>✨ Cập nhật mới: Mô hình AI nhận diện nhãn tinh gọn dưới 20ml đã ra mắt!</span>
+      </div>
+
+      {/* Navbar */}
+      <nav style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+        padding: '16px 48px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: scrolled ? 'rgba(15, 15, 15, 0.8)' : 'transparent',
+        backdropFilter: scrolled ? 'blur(12px)' : 'none',
+        borderBottom: scrolled ? '1px solid rgba(249, 115, 22, 0.1)' : '1px solid transparent',
+        transition: 'all 0.3s ease',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{
+            width: '32px', height: '32px', borderRadius: '8px',
+            background: 'linear-gradient(135deg, #f97316, #ea580c)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
           }}>
-            <Plus size={16} />
-            Tạo Check Mới
-          </button>
-        </Link>
-      </div>
-
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
-        <StatCard
-          label="Tổng số lần check"
-          value={MOCK_SESSIONS.length}
-          sub="Tất cả thời gian"
-          color="var(--text-primary)"
-        />
-        <StatCard
-          label="Pass Rate"
-          value={`${passRate}%`}
-          sub={`${passCount}/${MOCK_SESSIONS.length} nhãn đạt`}
-          color="var(--accent-green)"
-        />
-        <StatCard
-          label="Cần xem lại"
-          value={failCount}
-          sub="Có lỗi cần sửa"
-          color="var(--accent-red)"
-        />
-        <StatCard
-          label="Brands đã check"
-          value={new Set(MOCK_SESSIONS.map(s => s.brandId)).size}
-          sub="Thương hiệu khác nhau"
-          color="var(--accent-blue)"
-        />
-      </div>
-
-      {/* Filter */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
-        {(['all', 'pass', 'fail', 'warning'] as const).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            style={{
-              padding: '6px 16px',
-              borderRadius: '8px',
-              border: '1px solid',
-              borderColor: filter === f ? 'var(--accent-blue)' : 'var(--border)',
-              background: filter === f ? 'var(--accent-blue-glow)' : 'transparent',
-              color: filter === f ? 'var(--accent-blue)' : 'var(--text-secondary)',
-              fontSize: '13px',
-              fontWeight: filter === f ? 600 : 400,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            {f === 'all' ? 'Tất cả' : f === 'pass' ? '✅ Pass' : f === 'fail' ? '❌ Fail' : '⚠️ Cảnh báo'}
-          </button>
-        ))}
-      </div>
-
-      {/* Table */}
-      <div className="card" style={{ overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {['Sản phẩm', 'Brand', 'Loại nhãn', 'Kết quả', 'Lỗi / Cảnh báo', 'Ngày check', ''].map(h => (
-                <th key={h} style={{
-                  padding: '12px 16px',
-                  textAlign: 'left',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: 'var(--text-muted)',
-                  letterSpacing: '0.05em',
-                  textTransform: 'uppercase',
-                }}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {sessions.map((session, i) => (
-              <tr
-                key={session.id}
-                style={{
-                  borderBottom: i < sessions.length - 1 ? '1px solid var(--border)' : 'none',
-                  transition: 'background 0.15s ease',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-card-hover)')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-              >
-                <td style={{ padding: '14px 16px' }}>
-                  <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {session.productName}
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    {session.volumeFormatted}
-                  </div>
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      background: MOCK_BRANDS.find(b => b.id === session.brandId)?.color || '#888',
-                    }} />
-                    <span style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{session.brandName}</span>
-                  </div>
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  <span style={{
-                    fontSize: '12px',
-                    padding: '3px 10px',
-                    borderRadius: '6px',
-                    background: 'var(--border)',
-                    color: 'var(--text-secondary)',
-                  }}>
-                    {session.labelType}
-                  </span>
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  <StatusBadge status={session.status} />
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    {session.totalErrors > 0 && (
-                      <span style={{ fontSize: '13px', color: 'var(--accent-red)', fontWeight: 600 }}>
-                        ❌ {session.totalErrors} lỗi
-                      </span>
-                    )}
-                    {session.totalWarnings > 0 && (
-                      <span style={{ fontSize: '13px', color: 'var(--accent-yellow)', fontWeight: 600 }}>
-                        ⚠ {session.totalWarnings} cảnh báo
-                      </span>
-                    )}
-                    {session.totalErrors === 0 && session.totalWarnings === 0 && (
-                      <span style={{ fontSize: '13px', color: 'var(--accent-green)' }}>Không có lỗi</span>
-                    )}
-                  </div>
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                    {new Date(session.createdAt).toLocaleDateString('vi-VN')}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                    {session.checkedBy}
-                  </div>
-                </td>
-                <td style={{ padding: '14px 16px' }}>
-                  <Link href={`/check/${session.id}`} style={{ textDecoration: 'none' }}>
-                    <button style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      padding: '6px 14px',
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border-light)',
-                      borderRadius: '8px',
-                      color: 'var(--text-secondary)',
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}>
-                      Xem <ChevronRight size={14} />
-                    </button>
-                  </Link>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {sessions.length === 0 && (
-          <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            Không có kết quả phù hợp
+            <ShieldCheck size={18} color="#ffffff" />
           </div>
-        )}
+          <span style={{ fontSize: '18px', fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>
+            LabelCheck <span style={{ color: '#f97316' }}>AI</span>
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <Link href="/dashboard" style={{ textDecoration: 'none' }}>
+            <button style={{
+              padding: '10px 20px',
+              background: 'transparent',
+              border: '1px solid rgba(249, 115, 22, 0.5)',
+              borderRadius: '30px',
+              color: '#f97316',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(249, 115, 22, 0.1)'; e.currentTarget.style.borderColor = '#f97316'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'rgba(249, 115, 22, 0.5)'; }}
+            >
+              Open Application <ArrowRight size={16} />
+            </button>
+          </Link>
+        </div>
+      </nav>
+
+      {/* Hero Section */}
+      <div style={{
+        padding: '100px 20px 0',
+        textAlign: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        background: 'radial-gradient(ellipse at top, rgba(249, 115, 22, 0.15) 0%, rgba(10, 10, 10, 0) 70%)',
+      }}>
+        <div style={{
+          display: 'inline-block', padding: '6px 16px', borderRadius: '30px',
+          border: '1px solid rgba(249, 115, 22, 0.2)', color: '#f97316', fontSize: '12px', fontWeight: 600,
+          marginBottom: '32px', background: 'rgba(249, 115, 22, 0.05)'
+        }}>
+          <span style={{ width: '8px', height: '8px', background: '#f97316', borderRadius: '50%', display: 'inline-block', marginRight: '8px', boxShadow: '0 0 8px #f97316' }}></span>
+          The ultimate tool for Beauty QA processes
+        </div>
+
+        <h1 style={{
+          fontSize: '64px', fontWeight: 800, color: '#fff', maxWidth: '900px', margin: '0 auto 24px',
+          lineHeight: 1.1, letterSpacing: '-0.03em'
+        }}>
+          Định chuẩn chất lượng với <br />
+          <span style={{
+            color: '#f97316', fontStyle: 'italic', fontFamily: 'serif', paddingRight: '12px'
+          }}>LabelCheck AI</span>
+        </h1>
+
+        <p style={{ fontSize: '18px', color: '#94a3b8', maxWidth: '600px', margin: '0 auto 40px', lineHeight: 1.6 }}>
+          Hệ thống AI tự động đối chiếu và soát lỗi nhãn mác mỹ phẩm chuẩn quy định pháp luật. Tiết kiệm 80% thời gian duyệt, đảm bảo an toàn 100% trước khi ra thị trường.
+        </p>
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginBottom: '80px', position: 'relative' }}>
+          <Link href="/check" style={{ textDecoration: 'none', position: 'relative', zIndex: 2 }}>
+            <button style={{
+              padding: '16px 40px', background: '#f97316', border: 'none', borderRadius: '30px',
+              color: '#ffffff', fontSize: '18px', fontWeight: 700, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '10px', boxShadow: '0 8px 32px rgba(249, 115, 22, 0.4)',
+              transition: 'all 0.2s ease',
+            }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+            >
+              <span style={{ fontSize: '22px' }}>+</span> Truy cập
+            </button>
+          </Link>
+
+          {/* Instruction Text & Arrows - Moved Below */}
+          <div style={{ color: '#f97316', fontSize: '14px', fontWeight: 500, fontStyle: 'italic', textAlign: 'center' }}>
+            <div style={{ fontSize: '24px', marginBottom: '4px', transform: 'rotate(-90deg)' }}>↳</div>
+            Tiến hành kiểm duyệt <br /> nhãn mác ngay
+          </div>
+        </div>
+
+        {/* Dashboard Mockup - Glassmorphism */}
+        <div style={{
+          maxWidth: '1100px', margin: '0 auto', background: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: '24px 24px 0 0', padding: '24px 24px 0', border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 -20px 60px rgba(0,0,0,0.5)', position: 'relative', zIndex: 10
+        }}>
+          {/* Mac window controls */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#ef4444' }}></div>
+            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#f59e0b' }}></div>
+            <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10b981' }}></div>
+          </div>
+
+          {/* Fake Dashboard UI */}
+          <div style={{ background: '#f8fafc', borderRadius: '16px 16px 0 0', height: '400px', overflow: 'hidden', display: 'flex' }}>
+            <div style={{ width: '200px', background: '#fff', borderRight: '1px solid #e2e8f0', padding: '20px' }}>
+              <div style={{ width: '100%', height: '32px', background: '#f1f5f9', borderRadius: '6px', marginBottom: '16px' }}></div>
+              <div style={{ width: '70%', height: '20px', background: '#f1f5f9', borderRadius: '4px', marginBottom: '12px' }}></div>
+              <div style={{ width: '80%', height: '20px', background: '#f1f5f9', borderRadius: '4px', marginBottom: '12px' }}></div>
+              <div style={{ width: '60%', height: '20px', background: '#f1f5f9', borderRadius: '4px', marginBottom: '12px' }}></div>
+            </div>
+            <div style={{ flex: 1, padding: '32px', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: '-15px', right: '30%', background: '#ffedd5', color: '#ea580c', padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: 600, boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 20 }}>
+                Hiển thị các Brands hiện có
+                <div style={{ width: '0', height: '0', borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '6px solid #ffedd5', position: 'absolute', bottom: '-6px', left: '20px' }}></div>
+              </div>
+              <div style={{ width: '40%', height: '36px', background: '#fff', borderRadius: '8px', marginBottom: '24px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                {MOCK_BRANDS.slice(0, 3).map((brand, i) => (
+                  <div key={brand.id} style={{
+                    height: '120px',
+                    background: i === 0 ? 'linear-gradient(135deg, #f97316, #ea580c)' : '#fff',
+                    borderRadius: '12px',
+                    boxShadow: i === 0 ? '0 4px 12px rgba(249, 115, 22, 0.3)' : '0 1px 3px rgba(0,0,0,0.05)',
+                    padding: '16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {brand.logoUrl ? (
+                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: '#fff', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <img src={brand.logoUrl} alt={brand.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                        </div>
+                      ) : (
+                        <div style={{ width: '32px', height: '32px', background: i === 0 ? 'rgba(255,255,255,0.2)' : '#f1f5f9', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: i === 0 ? '#fff' : brand.color, fontWeight: 'bold' }}>
+                          {brand.name[0]}
+                        </div>
+                      )}
+
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: 700, color: i === 0 ? '#fff' : '#0f172a', marginBottom: '4px' }}>{brand.name}</div>
+                      <div style={{ fontSize: '10px', color: i === 0 ? 'rgba(255,255,255,0.8)' : '#64748b' }}>{brand.registeredCompanyName.slice(0, 20)}...</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* White Section: Features */}
+      <div style={{ background: '#ffffff', color: '#0f172a', padding: '80px 48px', position: 'relative', zIndex: 11 }}>
+
+        {/* Features Title */}
+        <div style={{ textAlign: 'center', marginBottom: '64px' }}>
+          <div style={{
+            display: 'inline-block', padding: '6px 16px', borderRadius: '30px',
+            background: '#fff7ed', color: '#f97316', fontSize: '13px', fontWeight: 600, marginBottom: '16px'
+          }}>
+            • Tính năng nổi bật
+          </div>
+          <h2 style={{ fontSize: '48px', fontWeight: 800, letterSpacing: '-0.02em', maxWidth: '600px', margin: '0 auto', lineHeight: 1.1 }}>
+            Khám phá sức mạnh <br /> dữ liệu với <span style={{ fontStyle: 'italic', fontFamily: 'serif', color: '#f97316' }}>LabelCheck</span>
+          </h2>
+        </div>
+
+        {/* Feature Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '24px', maxWidth: '1100px', margin: '0 auto' }}>
+          {[
+            {
+              icon: UploadCloud, color: '#3b82f6', bg: '#eff6ff',
+              title: 'Upload & Connect seamlessly',
+              desc: 'Kéo thả PDF, Hệ thống tự động bóc tách text và hình ảnh chỉ trong nháy mắt.'
+            },
+            {
+              icon: Shield, color: '#10b981', bg: '#ecfdf5',
+              title: 'Free & fast security',
+              desc: 'Dữ liệu HSCB tĩnh được bảo mật an toàn. So khớp chéo tự động không sai sót.'
+            },
+            {
+              icon: BarChart3, color: '#f59e0b', bg: '#fffbeb',
+              title: 'Flexible reports',
+              desc: 'Xuất kết quả kiểm tra dạng báo cáo chi tiết, phân rõ vùng Lỗi và Cảnh báo ngữ pháp.'
+            },
+            {
+              icon: Package, color: '#8b5cf6', bg: '#f5f3ff',
+              title: 'Format Analyzer',
+              desc: 'Đo lường kích thước mã vạch, độ phân giải logo và các yếu tố in ấn vật lý.'
+            },
+            {
+              icon: Zap, color: '#ec4899', bg: '#fdf2f8',
+              title: 'AI Grammar Checker',
+              desc: 'Tự động bắt các từ cấm y tế, check PAO và Claim theo chuẩn Bộ Y Tế.'
+            },
+            {
+              icon: ShieldCheck, color: '#14b8a6', bg: '#f0fdfa',
+              title: 'Cost & Analyzer reviews',
+              desc: 'Tích hợp Database lưu Brand Info cố định, sử dụng lại cho nhiều lần audit.'
+            }
+          ].map((feat, i) => (
+            <div key={i} style={{
+              padding: '32px',
+              background: '#f8fafc',
+              borderRadius: '20px',
+              border: '1px solid #e2e8f0',
+              transition: 'all 0.3s ease',
+              cursor: 'pointer',
+            }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-4px)'; e.currentTarget.style.boxShadow = '0 12px 32px rgba(0,0,0,0.05)'; e.currentTarget.style.background = '#fff'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = '#f8fafc'; }}
+            >
+              <div style={{
+                width: '48px', height: '48px', borderRadius: '12px', background: feat.bg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '20px'
+              }}>
+                <feat.icon size={24} color={feat.color} />
+              </div>
+              <h3 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '12px' }}>{feat.title}</h3>
+              <p style={{ fontSize: '15px', color: '#64748b', lineHeight: 1.6 }}>{feat.desc}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
