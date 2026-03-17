@@ -171,7 +171,7 @@ export default function BrandsPage() {
             const { data, error } = await supabase.from('brands').select('*');
             if (error) throw error;
 
-            if (data) {
+            if (data && data.length > 0) {
                 const formattedBrands: Brand[] = data.map(item => ({
                     id: item.id,
                     name: item.name,
@@ -184,9 +184,17 @@ export default function BrandsPage() {
                     color: item.color || '#EA580C',
                 }));
                 setBrands(formattedBrands);
+            } else {
+                // No data from Supabase, use mock data
+                const { MOCK_BRANDS } = await import('@/lib/mock-data');
+                setBrands(MOCK_BRANDS);
             }
         } catch (err: any) {
-            setError(err.message);
+            // Supabase unreachable — fallback to mock data
+            console.warn('Supabase unreachable, using mock data:', err.message);
+            const { MOCK_BRANDS } = await import('@/lib/mock-data');
+            setBrands(MOCK_BRANDS);
+            setError(null); // Clear error since we have fallback data
         } finally {
             setLoading(false);
         }

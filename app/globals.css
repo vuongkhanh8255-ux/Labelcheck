@@ -303,3 +303,18 @@ body {
   border-color: rgba(139, 92, 246, 0.2);
   background: rgba(139, 92, 246, 0.05);
 }
+
+/* Spinning animations for AI analysis overlay */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin-reverse {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
