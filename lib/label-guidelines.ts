@@ -210,10 +210,16 @@ Trả kết quả dưới dạng JSON theo format được chỉ định.
 - Sai khoảng trắng, viết hoa/thường khác HSCB → "warning"
 - KHÔNG ĐƯỢC bỏ qua sự khác biệt về dấu câu với lý do "nội dung giống nhau"
 
-1. **So sánh Tên Sản Phẩm:**
-   - Tên sản phẩm trên Nhãn PHẢI KHỚP TỪNG CHỮ với Tên Sản Phẩm người dùng nhập vào (nếu có).
-   - Tên sản phẩm trên Nhãn PHẢI KHỚP TỪNG CHỮ với Tên Sản Phẩm trong file HSCB (nếu có).
-   - Nếu KHÁC NHAU DÙ CHỈ 1 TỪ (hoặc trật từ, thiếu chữ, thiếu dấu câu) → Đánh "error" ngay lập tức cho mục "ten_san_pham" và giải thích rõ ràng. KHÔNG ĐƯỢC TỰ SUY DIỄN RẰNG "Ý NGHĨA GIỐNG NHAU LÀ ĐƯỢC".
+1. **So sánh Tên Sản Phẩm:** ⚠️ NGHIÊM NGẶT TUYỆT ĐỐI
+   - Tên sản phẩm trên Nhãn PHẢI KHỚP TỪNG KÝ TỰ (kể cả dấu câu) với Tên Sản Phẩm người dùng nhập vào (nếu có).
+   - Tên sản phẩm trên Nhãn PHẢI KHỚP TỪNG KÝ TỰ (kể cả dấu câu) với Tên Sản Phẩm trong file HSCB (nếu có).
+   - 🚨 CÁC TRƯỜNG HỢP BẮT BUỘC "error":
+     + Thiếu hoặc thừa dấu phẩy (,): VD nhãn "Dưỡng Ẩm Bảo Vệ Tóc" nhưng HSCB "Dưỡng Ẩm, Bảo Vệ Tóc" → ERROR
+     + Thiếu hoặc thừa dấu gạch ngang (-) hoặc (–): VD nhãn không có "–" mà HSCB có → ERROR
+     + Thiếu hoặc thừa từ bất kỳ
+     + Sai thứ tự từ
+   - KHÔNG ĐƯỢC TỰ SUY DIỄN "Ý NGHĨA GIỐNG NHAU LÀ ĐƯỢC" hay "Chỉ thiếu dấu câu nhỏ"
+   - Bạn SẼ BỊ PHẠT NẶNG nếu báo "ok" khi tên có bất kỳ sai lệch nào so với HSCB
 2. **So sánh Thành phần (Ingredients):** PHẢI KHỚP HOÀN TOÀN với danh sách trong HSCB mục 11. Liệt kê cụ thể các thành phần thừa/thiếu nếu có sai lệch. Nếu nhãn dùng tên thành phần khác với tên INCI trong HSCB → status = "error" ngay lập tức. ĐỪNG chấp nhận "ý nghĩa tương đương" hay "cùng nguồn gốc" — tên phải giống nhau.
 3. **So sánh Số Công Bố:** Số trên nhãn PHẢI KHỚP KÝ TỰ với số trên HSCB.
 4. **So sánh Công Dụng:** PHẢI KHỚP ý nghĩa cốt lõi trong HSCB, không thêm bớt công dụng ngoài.
