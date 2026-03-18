@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Brand, CheckFormData, LabelType } from '@/types';
 import { formatVolumeLabel } from '@/lib/unit-converter';
-import { ensureImageFile } from '@/lib/pdf-to-image';
+import { ensureImageFile, compressImage } from '@/lib/pdf-to-image';
+import { saveCheckSession } from '@/lib/check-history';
 import { ChevronRight, ChevronLeft, Upload, X, Check, Package, Building2, FileText, Barcode, Bot, Loader2 } from 'lucide-react';
 
 const STEPS = ['Loại nhãn', 'Thương hiệu', 'Tải file & Nhập liệu', 'Xem lại'];
@@ -312,13 +313,26 @@ export default function CheckPage() {
         setError(null);
 
         try {
-            // Convert PDF to image if needed (GPT-4o Vision only accepts images)
-            const imageFile = await ensureImageFile(form.labelFile);
+            // Convert all files to compressed images for GPT-4o Vision
+            // Target ~1MB each (3 files × ~1MB = ~3MB, well under Vercel's 4.5MB limit)
+            let labelImage = await ensureImageFile(form.labelFile);
+            labelImage = await compressImage(labelImage, 1000, 0.6);
 
             const formData = new FormData();
-            formData.append('labelFile', imageFile);
-            if (form.hscbFile) formData.append('hscbFile', form.hscbFile);
-            if (form.barcodeFile) formData.append('barcodeFile', form.barcodeFile);
+            formData.append('labelFile', labelImage);
+
+            // Also compress & send HSCB and barcode for cross-referencing
+            if (form.hscbFile) {
+                let hscbImage = await ensureImageFile(form.hscbFile);
+                hscbImage = await compressImage(hscbImage, 1000, 0.6);
+                formData.append('hscbFile', hscbImage);
+            }
+            if (form.barcodeFile) {
+                let barcodeImage = await ensureImageFile(form.barcodeFile);
+                barcodeImage = await compressImage(barcodeImage, 1000, 0.6);
+                formData.append('barcodeFile', barcodeImage);
+            }
+
             formData.append('productName', form.productName);
             formData.append('brandName', selectedBrand?.name || '');
             formData.append('volume', volumeFormatted);
@@ -330,6 +344,13 @@ export default function CheckPage() {
                 body: formData,
             });
 
+            // Handle non-JSON responses gracefully
+            const contentType = response.headers.get('content-type') || '';
+            if (!contentType.includes('application/json')) {
+                const text = await response.text();
+                throw new Error(`Server error: ${text.substring(0, 200)}`);
+            }
+
             const data = await response.json();
 
             if (!response.ok) {
@@ -337,6 +358,13 @@ export default function CheckPage() {
             }
 
             // Store result and form info in sessionStorage
+            const sessionId = `check_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const aiItems = data.result?.items || [];
+            const totalErrors = aiItems.filter((i: { status: string }) => i.status === 'error').length;
+            const totalWarnings = aiItems.filter((i: { status: string }) => i.status === 'warning').length;
+            const totalOk = aiItems.filter((i: { status: string }) => i.status === 'ok').length;
+            const overallStatus = totalErrors > 0 ? 'fail' : totalWarnings > 0 ? 'warning' : 'pass';
+
             const resultPayload = {
                 aiResult: data.result,
                 productName: form.productName,
@@ -349,6 +377,25 @@ export default function CheckPage() {
                 createdAt: new Date().toISOString(),
                 usage: data.usage,
             };
+
+            // Save to localStorage for dashboard history
+            saveCheckSession({
+                id: sessionId,
+                productName: form.productName,
+                brandId: form.brandId,
+                brandName: selectedBrand?.name || '',
+                labelType: form.labelType,
+                volume: form.volume,
+                volumeFormatted,
+                status: overallStatus as 'pass' | 'fail' | 'warning',
+                createdAt: new Date().toISOString(),
+                checkedBy: 'GPT-4o Vision',
+                totalErrors,
+                totalWarnings,
+                totalOk,
+                aiResult: data.result,
+                labelFileUrl: null, // Don't store large base64 in history
+            });
 
             // We need to store the image as base64 for the result page
             if (form.labelFile) {

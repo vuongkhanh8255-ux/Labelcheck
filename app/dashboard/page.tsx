@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { MOCK_BRANDS } from '@/lib/mock-data';
 import { supabase } from '@/lib/supabase';
+import { getCheckSessions, toCheckSession } from '@/lib/check-history';
 import { CheckSession } from '@/types';
 import {
     Plus, CheckCircle2, XCircle, AlertTriangle, Clock,
@@ -47,37 +48,53 @@ export default function DashboardPage() {
 
     const fetchSessions = async () => {
         try {
-            const { data, error } = await supabase
-                .from('check_sessions')
-                .select('*')
-                .order('created_at', { ascending: false });
+            // Read from localStorage first (always available)
+            const localSessions = getCheckSessions().map(toCheckSession);
 
-            if (error) throw error;
-            if (data) {
-                const formatted: CheckSession[] = data.map(item => ({
-                    id: item.id,
-                    productName: item.product_name,
-                    brandId: item.brand_id,
-                    brandName: item.brand_name,
-                    labelType: item.label_type as any,
-                    volume: item.volume,
-                    volumeFormatted: item.volume_formatted,
-                    status: item.status as any,
-                    createdAt: item.created_at,
-                    checkedBy: item.checked_by || 'LabelCheck System',
-                    labelFileUrl: item.label_file_url,
-                    hscbFileUrl: item.hscb_file_url,
-                    barcodeFileUrl: item.barcode_file_url,
-                    barcodeResult: item.barcode_result,
-                    contentItems: item.content_items || [],
-                    totalErrors: item.total_errors || 0,
-                    totalWarnings: item.total_warnings || 0,
-                    totalOk: item.total_ok || 0,
-                }));
-                setRawSessions(formatted);
+            // Also try Supabase (may be paused)
+            try {
+                const { data, error } = await supabase
+                    .from('check_sessions')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (!error && data && data.length > 0) {
+                    const supabaseSessions: CheckSession[] = data.map(item => ({
+                        id: item.id,
+                        productName: item.product_name,
+                        brandId: item.brand_id,
+                        brandName: item.brand_name,
+                        labelType: item.label_type as CheckSession['labelType'],
+                        volume: item.volume,
+                        volumeFormatted: item.volume_formatted,
+                        status: item.status as CheckSession['status'],
+                        createdAt: item.created_at,
+                        checkedBy: item.checked_by || 'LabelCheck System',
+                        labelFileUrl: item.label_file_url,
+                        hscbFileUrl: item.hscb_file_url,
+                        barcodeFileUrl: item.barcode_file_url,
+                        barcodeResult: item.barcode_result,
+                        contentItems: item.content_items || [],
+                        totalErrors: item.total_errors || 0,
+                        totalWarnings: item.total_warnings || 0,
+                        totalOk: item.total_ok || 0,
+                    }));
+
+                    // Merge: local first, then Supabase (deduplicate by id)
+                    const localIds = new Set(localSessions.map(s => s.id));
+                    const merged = [...localSessions, ...supabaseSessions.filter(s => !localIds.has(s.id))];
+                    merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                    setRawSessions(merged);
+                } else {
+                    setRawSessions(localSessions);
+                }
+            } catch {
+                // Supabase unavailable, use local only
+                setRawSessions(localSessions);
             }
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Unknown error';
+            setError(msg);
         } finally {
             setLoading(false);
         }

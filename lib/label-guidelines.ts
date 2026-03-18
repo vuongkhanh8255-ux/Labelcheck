@@ -139,9 +139,14 @@ Trả kết quả dưới dạng JSON theo format được chỉ định.
 - Format: [Tên công ty] + [Địa chỉ] + [SĐT] + [Website]
 - Mỗi Brand đã đăng ký với 1 thông tin tổ chức chịu trách nhiệm
 
-### 13. MÃ VẠCH (Bắt buộc)
+### 13. MÃ VẠCH (Bắt buộc) ⚠️ KIỂM TRA RẤT QUAN TRỌNG
 - Dùng 100% số và hình
-- Check với file mã vạch ABM up lên hệ thống so khớp
+- ⚠️ PHẢI ĐỌC VÀ SO KHỚP SỐ MÃ VẠCH:
+  + Đọc dãy số dưới mã vạch trên ẢNH NHÃN SẢN PHẨM
+  + Đọc dãy số dưới mã vạch trên ẢNH MÃ VẠCH GỐC (nếu được cung cấp)
+  + SO SÁNH TỪNG SỐ: nếu 2 dãy số KHÁC NHAU → status = "error", ghi rõ 2 số trong note
+  + VD: Nhãn ghi "8936089073500" nhưng file barcode gốc ghi "8936089071971" → PHẢI báo error
+  + Nếu chỉ có 1 nguồn (không có ảnh barcode gốc), kiểm tra hình ảnh mã vạch rõ ràng, đúng format
 
 ### 14. KÝ HIỆU PAO ("3M", "6M", "12M") (Bắt buộc)
 - Biểu thị thời gian sử dụng sau mở nắp
@@ -160,38 +165,33 @@ Trả kết quả dưới dạng JSON theo format được chỉ định.
 - "Y khoa" → cấm tuyệt đối
 - "Kháng khuẩn" — cần hồ sơ chứng minh
 - "Trắng da" → cần thận trọng, nên dùng "Làm sáng da"
-- Không sử dụng cho ★ [Biểu tượng bộc vàng đa kỷ luật]
-- Không dùng biểu tượng vàng da có vẻ thương bột. Đồ sủ lam tay trẻ em.
-
-### Quy chuẩn chính tả:
-- Tránh dùng "mạnh mẽ/cực" → "dịu luôn bé thường"
-- Ngưỡng sữ dụng nẫu → "dẻ luôn khu bé thường"  
-- Viết tắt: "*" , "," → Không được dùng ký tự đặc biệt quá mức
 
 ## IV. GUIDELINE CHECK MÃ VẠCH / MÃ QR
 
 ### 1. Kích thước tối thiểu
-- Kích thước không ảnh hưởng đến khả năng quét
 - Chiều rộng tối thiểu: 2.5 cm
 - Chiều cao tối thiểu: 1.3 cm
 
 ### 2. Màu sắc
 - Vạch phải tối — nền phải sáng, độ tương phản cao
-- Tốt nhất (chuẩn): Đen trên nền trắng (ưu tiên số 1)
-- Chấp nhận được:
-  + Xanh đậm, nâu đậm, tím đậm trên nền rất sáng
-  + Đen trên nền trắng / kem / vàng nhạt / xám rất nhạt
-- KHÔNG nên dùng (dễ lỗi quét):
+- Tốt nhất: Đen trên nền trắng
+- KHÔNG nên dùng:
   + Nền tối + vạch sáng (đảo màu)
-  + Đỏ / cam / vàng cho vạch (laser đỏ không nhận)
+  + Đỏ / cam / vàng cho vạch
   + Nền hologram, metallic, phản quang
-  + Gradient, pattern, trong suốt
-  + In trên bao bì bóng gương / không phủ mờ
 
 ### 3. Vị trí
-- Đặt ở góc dưới bên phải mặt sau bao bì để dễ quét
-- Khoảng trắng (Quiet Zone): Để lại khoảng trắng đủ rộng ở hai bên mã vạch (tối thiểu 2mm mỗi bên)
-- Tránh: Không đặt mã vạch ở mép bao bì, trên các nếp gấp hoặc bề mặt cong, gồ
+- Đặt ở góc dưới bên phải mặt sau bao bì
+- Khoảng trắng (Quiet Zone): tối thiểu 2mm mỗi bên
+- Tránh đặt ở mép bao bì, nếp gấp, bề mặt cong
+
+## V. ĐỐI CHIẾU VỚI HỒ SƠ CÔNG BỐ (HSCB)
+Nếu được cung cấp ảnh HSCB, BẮT BUỘC phải đối chiếu các thông tin sau:
+- Tên sản phẩm trên nhãn PHẢI KHỚP 100% với tên trong HSCB
+- Thành phần (Ingredients) PHẢI KHỚP với danh sách trong HSCB
+- Số công bố trên nhãn PHẢI KHỚP với số trên HSCB
+- Công dụng PHẢI KHỚP hoặc là phiên bản rút gọn của công dụng trong HSCB
+- Nếu thông tin KHÔNG KHỚP → status = "error", ghi rõ sự khác biệt
 `;
 
   const sizeSpecificRules = labelType === '>20ml'
@@ -248,6 +248,10 @@ Bạn PHẢI trả về JSON hợp lệ theo format sau. KHÔNG trả về text,
   ],
   "barcode": {
     "detected": true,
+    "labelBarcodeNumber": "Dãy số mã vạch đọc được từ ẢNH NHÃN (VD: 8936089073500)",
+    "uploadedBarcodeNumber": "Dãy số mã vạch đọc được từ ẢNH MÃ VẠCH GỐC upload lên (VD: 8936089071971), hoặc null nếu không có",
+    "numberMatch": "ok | error — ok nếu 2 số giống nhau, error nếu KHÁC nhau",
+    "numberNote": "Giải thích: VD 'Mã vạch trên nhãn (8936089073500) KHÔNG KHỚP với mã vạch gốc (8936089071971)' hoặc 'Mã vạch khớp'",
     "colorStatus": "ok | error | warning",
     "colorNote": "Mô tả tình trạng màu sắc mã vạch",
     "sizeStatus": "ok | error | warning",
@@ -298,5 +302,7 @@ ${labelType === '>20ml' ? `
 5. Với "expected", ghi lại quy định chuẩn phải tuân theo
 6. overallStatus = "fail" nếu có BẤT KỲ error nào, "pass" nếu không có error
 7. Trả lời bằng tiếng Việt
+8. ⚠️ MÃ VẠCH: Nếu có ảnh barcode gốc, BẮT BUỘC đọc số từ CẢ HAI ảnh (nhãn + barcode gốc) và SO SÁNH. Nếu số KHÁC NHAU dù chỉ 1 chữ số → status "error" ngay lập tức.
+9. ⚠️ HSCB: Nếu có ảnh HSCB, đối chiếu TẤT CẢ thông tin. Mọi sai lệch giữa nhãn và HSCB đều là error.
 `;
 }

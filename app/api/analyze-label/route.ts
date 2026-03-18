@@ -4,6 +4,16 @@ import { getSystemPrompt } from '@/lib/label-guidelines';
 
 // Force this route to be dynamic (no SSG)
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Allow up to 60s for OpenAI
+
+// IMPORTANT: Increase body size limit to allow 3 images
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};
 
 function getOpenAIClient() {
   return new OpenAI({
@@ -31,8 +41,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Convert files to base64 for GPT Vision
+    // Convert all files to base64 for GPT Vision
     const labelBase64 = await fileToBase64(labelFile);
+    const hscbBase64 = hscbFile ? await fileToBase64(hscbFile) : null;
+    const barcodeBase64 = barcodeFile ? await fileToBase64(barcodeFile) : null;
 
     // Build messages array
     const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -42,17 +54,19 @@ export async function POST(request: NextRequest) {
       },
       {
         role: 'user',
-        content: buildUserContent(
+        content: buildUserContent({
           labelBase64,
-          labelFile.type,
-          hscbFile,
-          barcodeFile,
+          labelMime: labelFile.type,
+          hscbBase64,
+          hscbMime: hscbFile?.type || null,
+          barcodeBase64,
+          barcodeMime: barcodeFile?.type || null,
           productName,
           brandName,
           volume,
           labelType,
           brandInfo,
-        ),
+        }),
       },
     ];
 
@@ -104,32 +118,36 @@ async function fileToBase64(file: File): Promise<string> {
   return Buffer.from(buffer).toString('base64');
 }
 
-function buildUserContent(
-  labelBase64: string,
-  mimeType: string,
-  hscbFile: File | null,
-  barcodeFile: File | null,
-  productName: string,
-  brandName: string,
-  volume: string,
-  labelType: '>20ml' | '<20ml',
-  brandInfo: string,
-): OpenAI.Chat.Completions.ChatCompletionContentPart[] {
+interface ContentParams {
+  labelBase64: string;
+  labelMime: string;
+  hscbBase64: string | null;
+  hscbMime: string | null;
+  barcodeBase64: string | null;
+  barcodeMime: string | null;
+  productName: string;
+  brandName: string;
+  volume: string;
+  labelType: '>20ml' | '<20ml';
+  brandInfo: string;
+}
+
+function buildUserContent(p: ContentParams): OpenAI.Chat.Completions.ChatCompletionContentPart[] {
   const parts: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
 
   // Context text
   let contextText = `Hãy kiểm tra nhãn sản phẩm mỹ phẩm sau đây:
 
 📦 Thông tin sản phẩm:
-- Tên sản phẩm: ${productName}
-- Thương hiệu: ${brandName}
-- Dung tích/Khối lượng: ${volume}
-- Loại nhãn: ${labelType === '>20ml' ? 'Nhãn đầy đủ (≥20ml/20g)' : 'Nhãn tinh gọn (<20ml/20g)'}
+- Tên sản phẩm: ${p.productName}
+- Thương hiệu: ${p.brandName}
+- Dung tích/Khối lượng: ${p.volume}
+- Loại nhãn: ${p.labelType === '>20ml' ? 'Nhãn đầy đủ (≥20ml/20g)' : 'Nhãn tinh gọn (<20ml/20g)'}
 `;
 
-  if (brandInfo) {
+  if (p.brandInfo) {
     try {
-      const info = JSON.parse(brandInfo);
+      const info = JSON.parse(p.brandInfo);
       contextText += `
 🏢 Thông tin Brand đã đăng ký:
 - Công ty: ${info.registeredCompanyName || 'N/A'}
@@ -142,21 +160,62 @@ function buildUserContent(
     }
   }
 
+  // Describe what images are provided
+  const imageList = ['📸 Ảnh 1: NHÃN SẢN PHẨM (bắt buộc kiểm tra)'];
+  if (p.hscbBase64) imageList.push('📸 Ảnh 2: HỒ SƠ CÔNG BỐ (HSCB) — đối chiếu thông tin với nhãn');
+  if (p.barcodeBase64) imageList.push('📸 Ảnh 3: MÃ VẠCH GỐC — kiểm tra chất lượng in, tương phản, kích thước');
+
   contextText += `
-📋 Hãy phân tích hình ảnh nhãn bên dưới và trả kết quả JSON theo format đã quy định trong system prompt.
-Kiểm tra TẤT CẢ các mục bắt buộc theo loại nhãn ${labelType}.
+📋 CÁC HÌNH ẢNH ĐƯỢC CUNG CẤP:
+${imageList.join('\n')}
+
+⚠️ QUAN TRỌNG:
+- Kiểm tra TẤT CẢ các mục bắt buộc theo loại nhãn ${p.labelType}
+${p.hscbBase64 ? '- ĐỐI CHIẾU thông tin trên nhãn với HSCB: tên sản phẩm, thành phần, công ty, ngày SX/HSD phải KHỚP' : ''}
+${p.barcodeBase64 ? '- Kiểm tra mã vạch: độ tương phản, kích thước, vùng trống (quiet zone)' : ''}
+- Trả kết quả JSON theo format đã quy định trong system prompt.
 `;
 
   parts.push({ type: 'text', text: contextText });
 
-  // Label image (primary)
+  // Image 1: Label (primary)
   parts.push({
     type: 'image_url',
     image_url: {
-      url: `data:${mimeType};base64,${labelBase64}`,
+      url: `data:${p.labelMime};base64,${p.labelBase64}`,
       detail: 'high',
     },
   });
+
+  // Image 2: HSCB (if provided)
+  if (p.hscbBase64 && p.hscbMime) {
+    parts.push({
+      type: 'text',
+      text: '📄 Dưới đây là ảnh HỒ SƠ CÔNG BỐ (HSCB). Đối chiếu thông tin với nhãn ở trên:',
+    });
+    parts.push({
+      type: 'image_url',
+      image_url: {
+        url: `data:${p.hscbMime};base64,${p.hscbBase64}`,
+        detail: 'high',
+      },
+    });
+  }
+
+  // Image 3: Barcode (if provided)
+  if (p.barcodeBase64 && p.barcodeMime) {
+    parts.push({
+      type: 'text',
+      text: '📊 Dưới đây là ảnh MÃ VẠCH GỐC. Kiểm tra chất lượng in, tương phản, kích thước:',
+    });
+    parts.push({
+      type: 'image_url',
+      image_url: {
+        url: `data:${p.barcodeMime};base64,${p.barcodeBase64}`,
+        detail: 'high',
+      },
+    });
+  }
 
   return parts;
 }

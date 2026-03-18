@@ -21,6 +21,10 @@ interface AICheckItem {
 
 interface AIBarcodeResult {
     detected: boolean;
+    labelBarcodeNumber?: string;
+    uploadedBarcodeNumber?: string | null;
+    numberMatch?: string;
+    numberNote?: string;
     colorStatus: string;
     colorNote: string;
     sizeStatus: string;
@@ -356,6 +360,35 @@ export default function ResultPage() {
                                     📊 Phân tích Mã Vạch
                                 </div>
                                 <div style={{ display: 'grid', gap: '8px' }}>
+                                    {/* Barcode number comparison */}
+                                    {aiResult.barcode.numberMatch && (
+                                        <div className={`result-item ${aiResult.barcode.numberMatch}`}>
+                                            <StatusIcon status={aiResult.barcode.numberMatch} />
+                                            <div>
+                                                <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>So khớp số mã vạch</div>
+                                                {aiResult.barcode.labelBarcodeNumber && (
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                                        Nhãn: <strong style={{ fontFamily: 'monospace' }}>{aiResult.barcode.labelBarcodeNumber}</strong>
+                                                    </div>
+                                                )}
+                                                {aiResult.barcode.uploadedBarcodeNumber && (
+                                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                                        Barcode gốc: <strong style={{ fontFamily: 'monospace' }}>{aiResult.barcode.uploadedBarcodeNumber}</strong>
+                                                    </div>
+                                                )}
+                                                {aiResult.barcode.numberNote && (
+                                                    <div style={{
+                                                        fontSize: '12px',
+                                                        color: aiResult.barcode.numberMatch === 'error' ? 'var(--accent-red)' : 'var(--accent-green)',
+                                                        marginTop: '4px',
+                                                        fontWeight: 600,
+                                                    }}>
+                                                        {aiResult.barcode.numberNote}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                     <div className={`result-item ${aiResult.barcode.colorStatus}`}>
                                         <StatusIcon status={aiResult.barcode.colorStatus} />
                                         <div>
