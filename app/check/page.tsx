@@ -258,6 +258,7 @@ export default function CheckPage() {
         labelFile: null,
         hscbFile: null,
         barcodeFile: null,
+        barcodeRef: '',
     });
     const [brands, setBrands] = useState<Brand[]>([]);
     const [loadingBrands, setLoadingBrands] = useState(true);
@@ -338,6 +339,9 @@ export default function CheckPage() {
             formData.append('volume', volumeFormatted);
             formData.append('labelType', form.labelType);
             formData.append('brandInfo', JSON.stringify(selectedBrand || {}));
+            if (form.barcodeRef) {
+                formData.append('barcodeRef', form.barcodeRef);
+            }
 
             const response = await fetch('/api/analyze-label', {
                 method: 'POST',
@@ -622,12 +626,40 @@ export default function CheckPage() {
                                     hint="Chấp nhận PDF, PNG, JPG"
                                 />
                                 <FileUploadZone
-                                    label="🔲 File mã vạch gốc"
+                                    label="🔲 File mã vạch gốc (tùy chọn — kiểm tra chất lượng in)"
                                     accept=".pdf,.png,.jpg,.jpeg"
                                     file={form.barcodeFile}
                                     onFile={f => setForm(x => ({ ...x, barcodeFile: f }))}
                                     icon={Barcode}
                                     hint="Chấp nhận PDF, PNG, JPG"
+                                />
+                            </div>
+
+                            {/* Barcode reference text input */}
+                            <div style={{ marginTop: '16px' }}>
+                                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                                    🔢 Số mã vạch gốc — nhập tay từ hồ sơ đăng ký (để so khớp chính xác)
+                                </label>
+                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                                    Nhập đúng dãy số dưới barcode trên hồ sơ công bố. VD: 8936089073500
+                                </p>
+                                <input
+                                    type="text"
+                                    value={form.barcodeRef}
+                                    onChange={e => setForm(f => ({ ...f, barcodeRef: e.target.value.trim() }))}
+                                    placeholder="VD: 8936089073500"
+                                    style={{
+                                        width: '100%',
+                                        padding: '10px 14px',
+                                        background: 'var(--bg-primary)',
+                                        border: '1px solid var(--border-light)',
+                                        borderRadius: '8px',
+                                        color: 'var(--text-primary)',
+                                        fontSize: '14px',
+                                        fontFamily: 'monospace',
+                                        letterSpacing: '1px',
+                                        outline: 'none',
+                                    }}
                                 />
                             </div>
 
@@ -729,6 +761,7 @@ export default function CheckPage() {
                                     { label: 'File nhãn', value: form.labelFile?.name || '—' },
                                     { label: 'File HSCB', value: form.hscbFile?.name || 'Chưa tải (tùy chọn)' },
                                     { label: 'File mã vạch', value: form.barcodeFile?.name || 'Chưa tải (tùy chọn)' },
+                                    { label: 'Số mã vạch gốc', value: form.barcodeRef || 'Chưa nhập (tùy chọn)' },
                                 ].map(({ label, value }) => (
                                     <div key={label} style={{
                                         display: 'flex',

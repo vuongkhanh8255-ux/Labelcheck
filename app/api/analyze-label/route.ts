@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     const volume = formData.get('volume') as string;
     const labelType = formData.get('labelType') as '>20ml' | '<20ml';
     const brandInfo = formData.get('brandInfo') as string;
+    const barcodeRef = (formData.get('barcodeRef') as string) || ''; // Số mã vạch gốc nhập tay
 
     if (!labelFile) {
       return NextResponse.json(
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
           volume,
           labelType,
           brandInfo,
+          barcodeRef,
         }),
       },
     ];
@@ -150,6 +152,7 @@ interface ContentParams {
   volume: string;
   labelType: '>20ml' | '<20ml';
   brandInfo: string;
+  barcodeRef: string; // Số mã vạch gốc nhập tay — chính xác 100%
 }
 
 function buildUserContent(p: ContentParams): OpenAI.Chat.Completions.ChatCompletionContentPart[] {
@@ -163,6 +166,22 @@ function buildUserContent(p: ContentParams): OpenAI.Chat.Completions.ChatComplet
 - Thương hiệu: ${p.brandName}
 - Dung tích/Khối lượng: ${p.volume}
 - Loại nhãn: ${p.labelType === '>20ml' ? 'Nhãn đầy đủ (≥20ml/20g)' : 'Nhãn tinh gọn (<20ml/20g)'}
+
+🚨 SO SÁNH BẮT BUỘC — ĐỌC KỸ TRƯỚC KHI PHÂN TÍCH:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+① TÊN SẢN PHẨM CHÍNH XÁC (người dùng nhập, tin 100%):
+   "${p.productName}"
+   → Đọc tên từ nhãn → So sánh TỪNG KÝ TỰ với chuỗi trên (kể cả dấu phẩy, gạch ngang, khoảng trắng).
+   → Nếu nhãn thiếu/thêm/sai bất kỳ ký tự hoặc dấu câu nào → status = "error" ngay lập tức.
+   → KHÔNG ĐƯỢC suy diễn "ý nghĩa giống nhau là được".
+${p.barcodeRef ? `
+② SỐ MÃ VẠCH GỐC CHÍNH XÁC (người dùng nhập tay, tin 100%):
+   "${p.barcodeRef}"
+   → Đọc dãy số mã vạch từ NHÃN SẢN PHẨM (ảnh 1).
+   → So sánh TỪNG CHỮ SỐ với "${p.barcodeRef}".
+   → Nếu khác dù 1 chữ số → numberMatch = "error".
+   → KHÔNG ĐƯỢC dùng số này làm số của nhãn — đây chỉ là số tham chiếu để SO SÁNH.
+` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `;
 
   if (p.brandInfo) {
@@ -183,7 +202,7 @@ function buildUserContent(p: ContentParams): OpenAI.Chat.Completions.ChatComplet
   // Describe what images are provided
   const imageList = ['📸 Ảnh 1: NHÃN SẢN PHẨM (bắt buộc kiểm tra)'];
   if (p.hscbBase64) imageList.push('📸 Ảnh 2: HỒ SƠ CÔNG BỐ (HSCB) — đối chiếu thông tin với nhãn');
-  if (p.barcodeBase64) imageList.push('📸 Ảnh 3: MÃ VẠCH GỐC — kiểm tra chất lượng in, tương phản, kích thước');
+  if (p.barcodeBase64) imageList.push('📸 Ảnh 3: MÃ VẠCH GỐC — kiểm tra chất lượng in, tương phản, kích thước (KHÔNG dùng để đọc số — số tham chiếu đã có ở trên)');
   if (p.logoBase64) imageList.push(`📸 Ảnh ${imageList.length + 1}: LOGO THƯƠNG HIỆU GỐC của brand "${p.brandName}" — so sánh với logo trên nhãn`);
 
   contextText += `
@@ -193,7 +212,8 @@ ${imageList.join('\n')}
 ⚠️ QUAN TRỌNG:
 - Kiểm tra TẤT CẢ các mục bắt buộc theo loại nhãn ${p.labelType}
 ${p.hscbBase64 ? '- ĐỐI CHIẾU thông tin trên nhãn với HSCB: tên sản phẩm, thành phần, công ty, ngày SX/HSD phải KHỚP' : ''}
-${p.barcodeBase64 ? '- Kiểm tra mã vạch: độ tương phản, kích thước, vùng trống (quiet zone)' : ''}
+${p.barcodeBase64 ? '- File mã vạch gốc được cung cấp để kiểm tra chất lượng in (màu sắc, kích thước, quiet zone). Số tham chiếu đã nhập ở trên.' : ''}
+${p.barcodeRef ? `- 🔢 Số barcode tham chiếu: "${p.barcodeRef}" — đọc số từ nhãn, so sánh với số này từng chữ số.` : ''}
 ${p.logoBase64 ? `- 🚨 KIỂM TRA LOGO: So sánh logo trên nhãn với LOGO GỐC của brand "${p.brandName}" (ảnh cuối cùng được cung cấp). Nếu logo trên nhãn KHÁC hoặc KHÔNG PHẢI logo của brand này → status = "warning" cho mục "logo_brand". Nếu không nhìn thấy logo brand trên nhãn → status = "warning".` : ''}
 - Trả kết quả JSON theo format đã quy định trong system prompt.
 `;
@@ -235,7 +255,7 @@ ${p.logoBase64 ? `- 🚨 KIỂM TRA LOGO: So sánh logo trên nhãn với LOGO G
   if (p.barcodeBase64 && p.barcodeMime) {
     parts.push({
       type: 'text',
-      text: '🔍 ĐÂY LÀ ẢNH MÃ VẠCH GỐC (BARCODE). Bạn TUYỆT ĐỐI KHÔNG ĐƯỢC tự động cho rằng nó giống mã vạch trên nhãn. Hãy đọc từng số trên ảnh này, sau đó đọc từng số trên Ảnh Nhãn phía trên, và so sánh. Nếu khác nhau dù 1 chữ số, PHẢI báo lỗi!',
+      text: `🔍 ĐÂY LÀ ẢNH MÃ VẠCH GỐC (BARCODE). Dùng ảnh này CHỈ để kiểm tra chất lượng in (màu sắc, kích thước, quiet zone). ${p.barcodeRef ? `Số tham chiếu đã được cung cấp là "${p.barcodeRef}" — KHÔNG đọc số từ ảnh này để so sánh.` : 'Hãy đọc số từ ảnh này nếu không có số tham chiếu.'}`,
     });
     parts.push({
       type: 'image_url',
