@@ -7,7 +7,8 @@ import { Brand, CheckFormData, LabelType } from '@/types';
 import { formatVolumeLabel } from '@/lib/unit-converter';
 import { ensureImageFile, compressImage } from '@/lib/pdf-to-image';
 import { saveCheckSession } from '@/lib/check-history';
-import { ChevronRight, ChevronLeft, Upload, X, Check, Package, Building2, FileText, Barcode, Bot, Loader2 } from 'lucide-react';
+import { decodeBarcodeFromFile } from '@/lib/barcode-scanner';
+import { ChevronRight, ChevronLeft, Upload, X, Check, Package, Building2, FileText, Barcode, Bot, Loader2, AlertTriangle, CheckCircle } from 'lucide-react';
 
 const STEPS = ['Loại nhãn', 'Thương hiệu', 'Tải file & Nhập liệu', 'Xem lại'];
 
@@ -265,6 +266,53 @@ export default function CheckPage() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // Barcode scanning states
+    const [labelBarcodeNumber, setLabelBarcodeNumber] = useState<string | null>(null);
+    const [refBarcodeNumber, setRefBarcodeNumber] = useState<string | null>(null);
+    const [scanningLabelBarcode, setScanningLabelBarcode] = useState(false);
+    const [scanningRefBarcode, setScanningRefBarcode] = useState(false);
+
+    // Auto-scan barcode when label image is uploaded
+    const handleLabelFileChange = async (f: File | null) => {
+        setForm(x => ({ ...x, labelFile: f }));
+        setLabelBarcodeNumber(null);
+        if (f) {
+            setScanningLabelBarcode(true);
+            try {
+                // Convert PDF to image if needed, then scan
+                const imageFile = await ensureImageFile(f);
+                const detected = await decodeBarcodeFromFile(imageFile);
+                setLabelBarcodeNumber(detected);
+            } catch (err) {
+                console.warn('Label barcode scan failed:', err);
+            } finally {
+                setScanningLabelBarcode(false);
+            }
+        }
+    };
+
+    // Auto-scan barcode when barcode reference file is uploaded
+    const handleBarcodeFileChange = async (f: File | null) => {
+        setForm(x => ({ ...x, barcodeFile: f }));
+        setRefBarcodeNumber(null);
+        if (f) {
+            setScanningRefBarcode(true);
+            try {
+                const imageFile = await ensureImageFile(f);
+                const detected = await decodeBarcodeFromFile(imageFile);
+                setRefBarcodeNumber(detected);
+                // Also set barcodeRef text for API
+                if (detected) {
+                    setForm(x => ({ ...x, barcodeRef: detected }));
+                }
+            } catch (err) {
+                console.warn('Ref barcode scan failed:', err);
+            } finally {
+                setScanningRefBarcode(false);
+            }
+        }
+    };
+
     useEffect(() => {
         const fetchBrands = async () => {
             try {
@@ -339,8 +387,13 @@ export default function CheckPage() {
             formData.append('volume', volumeFormatted);
             formData.append('labelType', form.labelType);
             formData.append('brandInfo', JSON.stringify(selectedBrand || {}));
-            if (form.barcodeRef) {
-                formData.append('barcodeRef', form.barcodeRef);
+            // Send barcode numbers detected by ZXing scanner
+            const effectiveBarcodeRef = form.barcodeRef || refBarcodeNumber || '';
+            if (effectiveBarcodeRef) {
+                formData.append('barcodeRef', effectiveBarcodeRef);
+            }
+            if (labelBarcodeNumber) {
+                formData.append('labelBarcodeScanned', labelBarcodeNumber);
             }
 
             const response = await fetch('/api/analyze-label', {
@@ -613,10 +666,45 @@ export default function CheckPage() {
                                     label="📄 File thiết kế nhãn (bắt buộc)"
                                     accept=".pdf,.png,.jpg,.jpeg,.webp"
                                     file={form.labelFile}
-                                    onFile={f => setForm(x => ({ ...x, labelFile: f }))}
+                                    onFile={handleLabelFileChange}
                                     icon={FileText}
                                     hint="Chấp nhận PDF, PNG, JPG, WEBP"
                                 />
+                                {/* Show detected barcode from label */}
+                                {form.labelFile && (
+                                    <div style={{
+                                        padding: '8px 12px',
+                                        borderRadius: '8px',
+                                        background: scanningLabelBarcode ? 'var(--bg-secondary)' :
+                                            labelBarcodeNumber ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                                        border: `1px solid ${scanningLabelBarcode ? 'var(--border)' :
+                                            labelBarcodeNumber ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        marginTop: '-8px',
+                                    }}>
+                                        {scanningLabelBarcode ? (
+                                            <>
+                                                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Đang quét mã vạch trên nhãn...</span>
+                                            </>
+                                        ) : labelBarcodeNumber ? (
+                                            <>
+                                                <CheckCircle size={14} color="var(--accent-green)" />
+                                                <span style={{ fontSize: '12px', color: 'var(--accent-green)', fontWeight: 600 }}>
+                                                    Mã vạch nhãn: <span style={{ fontFamily: 'monospace', letterSpacing: '1px' }}>{labelBarcodeNumber}</span>
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <AlertTriangle size={14} color="rgb(245, 158, 11)" />
+                                                <span style={{ fontSize: '12px', color: 'rgb(245, 158, 11)' }}>Không quét được mã vạch từ nhãn (AI sẽ đọc thay)</span>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
                                 <FileUploadZone
                                     label="📋 File HSCB — Hồ sơ công bố"
                                     accept=".pdf,.png,.jpg,.jpeg"
@@ -626,55 +714,111 @@ export default function CheckPage() {
                                     hint="Chấp nhận PDF, PNG, JPG"
                                 />
                                 <FileUploadZone
-                                    label="🔲 File mã vạch gốc (tùy chọn — kiểm tra chất lượng in)"
+                                    label="🔲 File mã vạch gốc (dùng để so khớp số + kiểm tra chất lượng in)"
                                     accept=".pdf,.png,.jpg,.jpeg"
                                     file={form.barcodeFile}
-                                    onFile={f => setForm(x => ({ ...x, barcodeFile: f }))}
+                                    onFile={handleBarcodeFileChange}
                                     icon={Barcode}
                                     hint="Chấp nhận PDF, PNG, JPG"
                                 />
-                            </div>
-
-                            {/* Barcode reference text input */}
-                            <div style={{ marginTop: '16px' }}>
-                                <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                                    🔢 Số mã vạch gốc — nhập tay từ hồ sơ đăng ký (để so khớp chính xác)
-                                </label>
-                                <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '8px' }}>
-                                    Nhập đúng dãy số dưới barcode trên hồ sơ công bố. VD: 8936089073500
-                                </p>
-                                <input
-                                    type="text"
-                                    value={form.barcodeRef}
-                                    onChange={e => setForm(f => ({ ...f, barcodeRef: e.target.value.trim() }))}
-                                    placeholder="VD: 8936089073500"
-                                    style={{
-                                        width: '100%',
-                                        padding: '10px 14px',
-                                        background: 'var(--bg-primary)',
-                                        border: '1px solid var(--border-light)',
+                                {/* Show detected barcode from reference + comparison */}
+                                {form.barcodeFile && (
+                                    <div style={{
+                                        padding: '8px 12px',
                                         borderRadius: '8px',
-                                        color: 'var(--text-primary)',
-                                        fontSize: '14px',
-                                        fontFamily: 'monospace',
-                                        letterSpacing: '1px',
-                                        outline: 'none',
-                                    }}
-                                />
+                                        background: scanningRefBarcode ? 'var(--bg-secondary)' :
+                                            refBarcodeNumber ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                                        border: `1px solid ${scanningRefBarcode ? 'var(--border)' :
+                                            refBarcodeNumber ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                                        marginTop: '-8px',
+                                    }}>
+                                        {scanningRefBarcode ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Đang quét mã vạch gốc...</span>
+                                            </div>
+                                        ) : refBarcodeNumber ? (
+                                            <div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                                    <CheckCircle size={14} color="var(--accent-green)" />
+                                                    <span style={{ fontSize: '12px', color: 'var(--accent-green)', fontWeight: 600 }}>
+                                                        Mã vạch gốc: <span style={{ fontFamily: 'monospace', letterSpacing: '1px' }}>{refBarcodeNumber}</span>
+                                                    </span>
+                                                </div>
+                                                {/* Inline comparison if both detected */}
+                                                {labelBarcodeNumber && (
+                                                    <div style={{
+                                                        marginTop: '6px',
+                                                        padding: '6px 10px',
+                                                        borderRadius: '6px',
+                                                        background: labelBarcodeNumber === refBarcodeNumber ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                    }}>
+                                                        {labelBarcodeNumber === refBarcodeNumber ? (
+                                                            <>
+                                                                <CheckCircle size={14} color="var(--accent-green)" />
+                                                                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-green)' }}>
+                                                                    ✓ Hai mã vạch KHỚP: {labelBarcodeNumber}
+                                                                </span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <X size={14} color="var(--accent-red)" />
+                                                                <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent-red)' }}>
+                                                                    ✗ KHÔNG KHỚP — Nhãn: {labelBarcodeNumber} | Gốc: {refBarcodeNumber}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                                    <AlertTriangle size={14} color="rgb(245, 158, 11)" />
+                                                    <span style={{ fontSize: '12px', color: 'rgb(245, 158, 11)' }}>Không quét được — nhập số mã vạch gốc thủ công:</span>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={form.barcodeRef}
+                                                    onChange={e => setForm(f => ({ ...f, barcodeRef: e.target.value.trim() }))}
+                                                    placeholder="VD: 8936089073500"
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '8px 12px',
+                                                        background: 'var(--bg-primary)',
+                                                        border: '1px solid var(--border-light)',
+                                                        borderRadius: '6px',
+                                                        color: 'var(--text-primary)',
+                                                        fontSize: '13px',
+                                                        fontFamily: 'monospace',
+                                                        letterSpacing: '1px',
+                                                        outline: 'none',
+                                                    }}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <div style={{ height: '1px', background: 'var(--border)', margin: '24px 0' }} />
 
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
                                 <div>
-                                    <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>
-                                        Tên sản phẩm (bắt buộc)
+                                    <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                                        Tên sản phẩm trên Hồ sơ công bố (bắt buộc)
                                     </label>
+                                    <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                                        Nhập chính xác tên sản phẩm từ HSCB — AI sẽ đối chiếu từng ký tự với nhãn
+                                    </p>
                                     <input
                                         type="text"
                                         value={form.productName}
                                         onChange={e => setForm(f => ({ ...f, productName: e.target.value }))}
-                                        placeholder="VD: Green Tea Seed Serum"
+                                        placeholder="VD: Moisturizing & Protecting Hair Serum – Sachi Oil, Argan Oil, EHMC"
                                         style={{
                                             width: '100%',
                                             padding: '10px 14px',

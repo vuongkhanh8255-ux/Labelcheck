@@ -32,7 +32,8 @@ export async function POST(request: NextRequest) {
     const volume = formData.get('volume') as string;
     const labelType = formData.get('labelType') as '>20ml' | '<20ml';
     const brandInfo = formData.get('brandInfo') as string;
-    const barcodeRef = (formData.get('barcodeRef') as string) || ''; // Số mã vạch gốc nhập tay
+    const barcodeRef = (formData.get('barcodeRef') as string) || ''; // Số mã vạch gốc (quét tự động hoặc nhập tay)
+    const labelBarcodeScanned = (formData.get('labelBarcodeScanned') as string) || ''; // Số mã vạch quét từ nhãn bằng ZXing
 
     if (!labelFile) {
       return NextResponse.json(
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
           labelType,
           brandInfo,
           barcodeRef,
+          labelBarcodeScanned,
         }),
       },
     ];
@@ -152,7 +154,8 @@ interface ContentParams {
   volume: string;
   labelType: '>20ml' | '<20ml';
   brandInfo: string;
-  barcodeRef: string; // Số mã vạch gốc nhập tay — chính xác 100%
+  barcodeRef: string; // Số mã vạch gốc (quét từ file hoặc nhập tay)
+  labelBarcodeScanned: string; // Số mã vạch quét từ nhãn bằng ZXing
 }
 
 function buildUserContent(p: ContentParams): OpenAI.Chat.Completions.ChatCompletionContentPart[] {
@@ -175,13 +178,20 @@ function buildUserContent(p: ContentParams): OpenAI.Chat.Completions.ChatComplet
    → Nếu nhãn thiếu/thêm/sai bất kỳ ký tự hoặc dấu câu nào → status = "error" ngay lập tức.
    → KHÔNG ĐƯỢC suy diễn "ý nghĩa giống nhau là được".
 ${p.barcodeRef ? `
-② SỐ MÃ VẠCH GỐC CHÍNH XÁC (người dùng nhập tay, tin 100%):
-   "${p.barcodeRef}"
-   → Đọc dãy số mã vạch từ NHÃN SẢN PHẨM (ảnh 1).
-   → So sánh TỪNG CHỮ SỐ với "${p.barcodeRef}".
-   → Nếu khác dù 1 chữ số → numberMatch = "error".
-   → KHÔNG ĐƯỢC dùng số này làm số của nhãn — đây chỉ là số tham chiếu để SO SÁNH.
-` : ''}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+② SỐ MÃ VẠCH GỐC (quét tự động từ file barcode, tin 100%):
+   "${p.barcodeRef}"` : ''}
+${p.labelBarcodeScanned ? `
+③ SỐ MÃ VẠCH TRÊN NHÃN (quét tự động bằng barcode scanner, tin 100%):
+   "${p.labelBarcodeScanned}"` : ''}
+${p.barcodeRef && p.labelBarcodeScanned ? `
+🔍 KẾT QUẢ SO KHỚP (đã xác minh bằng phần mềm):
+   → Nhãn: "${p.labelBarcodeScanned}" vs Gốc: "${p.barcodeRef}"
+   → ${p.labelBarcodeScanned === p.barcodeRef ? 'KHỚP ✓ → numberMatch = "ok"' : 'KHÔNG KHỚP ✗ → numberMatch = "error" — BẮT BUỘC'}
+   → Sử dụng CHÍNH XÁC hai số trên cho labelBarcodeNumber và uploadedBarcodeNumber. KHÔNG ĐỌC LẠI TỪ ẢNH.` : ''}
+${p.barcodeRef && !p.labelBarcodeScanned ? `
+   → Phần mềm không quét được barcode từ nhãn. Bạn PHẢI đọc số từ ảnh nhãn (ảnh 1) và so sánh với "${p.barcodeRef}".
+   → Nếu khác dù 1 chữ số → numberMatch = "error".` : ''}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `;
 
   if (p.brandInfo) {
