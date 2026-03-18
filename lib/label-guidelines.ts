@@ -203,13 +203,21 @@ Trả kết quả dưới dạng JSON theo format được chỉ định.
 
 ## V. ĐỐI CHIẾU VỚI TÊN SẢN PHẨM NHẬP VÀO & HỒ SƠ CÔNG BỐ (HSCB)
 Đây là bước cực kỳ quan trọng, BẠN KHÔNG ĐƯỢC PHÉP TỰ ĐỘNG KHỚP NẾU CHÚNG KHÁC NHAU.
-1. **So sánh Tên Sản Phẩm:** 
+
+### ⚠️ QUY TẮC CHÍNH TẢ VÀ DẤU CÂU (áp dụng cho MỌI so sánh với HSCB)
+- So sánh PHẢI bao gồm cả **dấu câu**: dấu phẩy (,), dấu chấm (.), dấu gạch ngang (-), dấu ngoặc ()
+- Thiếu hoặc thừa dấu phẩy → "error". VD: nhãn ghi "SACHI DẦU ARGAN EHMC" nhưng HSCB ghi "SACHI, DẦU ARGAN, EHMC" → lỗi thiếu dấu phẩy
+- Sai khoảng trắng, viết hoa/thường khác HSCB → "warning"
+- KHÔNG ĐƯỢC bỏ qua sự khác biệt về dấu câu với lý do "nội dung giống nhau"
+
+1. **So sánh Tên Sản Phẩm:**
    - Tên sản phẩm trên Nhãn PHẢI KHỚP TỪNG CHỮ với Tên Sản Phẩm người dùng nhập vào (nếu có).
    - Tên sản phẩm trên Nhãn PHẢI KHỚP TỪNG CHỮ với Tên Sản Phẩm trong file HSCB (nếu có).
-   - Nếu KHÁC NHAU DÙ CHỈ 1 TỪ (hoặc trật từ, thiếu chữ) → Đánh "error" ngay lập tức cho mục "ten_san_pham" và giải thích rõ ràng. KHÔNG ĐƯỢC TỰ SUY DIỄN RẰNG "Ý NGHĨA GIỐNG NHAU LÀ ĐƯỢC".
+   - Nếu KHÁC NHAU DÙ CHỈ 1 TỪ (hoặc trật từ, thiếu chữ, thiếu dấu câu) → Đánh "error" ngay lập tức cho mục "ten_san_pham" và giải thích rõ ràng. KHÔNG ĐƯỢC TỰ SUY DIỄN RẰNG "Ý NGHĨA GIỐNG NHAU LÀ ĐƯỢC".
 2. **So sánh Thành phần (Ingredients):** PHẢI KHỚP HOÀN TOÀN với danh sách trong HSCB mục 11. Liệt kê cụ thể các thành phần thừa/thiếu nếu có sai lệch. Nếu nhãn dùng tên thành phần khác với tên INCI trong HSCB → status = "error" ngay lập tức. ĐỪNG chấp nhận "ý nghĩa tương đương" hay "cùng nguồn gốc" — tên phải giống nhau.
 3. **So sánh Số Công Bố:** Số trên nhãn PHẢI KHỚP KÝ TỰ với số trên HSCB.
 4. **So sánh Công Dụng:** PHẢI KHỚP ý nghĩa cốt lõi trong HSCB, không thêm bớt công dụng ngoài.
+5. **So sánh USP / Tên phụ trên nhãn với HSCB:** Kiểm tra cả dấu phẩy, dấu chấm trong chuỗi tên. VD: "SACHI, DẦU ARGAN, EHMC" nếu nhãn viết "SACHI DẦU ARGAN EHMC" (thiếu dấu phẩy) → "error".
 - Nếu thông tin KHÔNG KHỚP → status = "error", ghi rõ sự khác biệt. Tương tự, ĐỪNG BAO GIỜ BỊA ĐẶT DỮ LIỆU ĐỂ CHO RẰNG CHÚNG KHỚP NHAU.
 `;
 
