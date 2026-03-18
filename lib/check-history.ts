@@ -22,7 +22,9 @@ export interface SavedCheckSession {
   totalWarnings: number;
   totalOk: number;
   aiResult: Record<string, unknown>;
-  labelFileUrl: string | null;
+  labelFileUrl?: string;
+  hscbFileUrl?: string;
+  barcodeFileUrl?: string;
 }
 
 /**
@@ -54,10 +56,32 @@ export function saveCheckSession(session: SavedCheckSession): void {
     total_ok: session.totalOk,
     ai_result: session.aiResult,
     content_items: session.aiResult?.items || [],
+    label_file_url: session.labelFileUrl,
+    hscb_file_url: session.hscbFileUrl,
+    barcode_file_url: session.barcodeFileUrl,
   }).then(({ error }) => {
     if (error) console.warn('Supabase save failed (data is still in localStorage):', error.message);
     else console.log('✅ Check session saved to Supabase');
   });
+}
+
+/**
+ * Delete a check session by ID from localStorage and Supabase
+ */
+export async function deleteCheckSession(id: string): Promise<void> {
+  if (typeof window === 'undefined') return;
+
+  // 1. Delete from localStorage
+  const existing = getCheckSessions();
+  const filtered = existing.filter(s => s.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+
+  // 2. Delete from Supabase
+  try {
+    await supabase.from('check_sessions').delete().eq('id', id);
+  } catch (error) {
+    console.error('Failed to delete from Supabase:', error);
+  }
 }
 
 /**
@@ -97,9 +121,9 @@ export function toCheckSession(saved: SavedCheckSession): CheckSession {
     status: saved.status,
     createdAt: saved.createdAt,
     checkedBy: saved.checkedBy,
-    labelFileUrl: saved.labelFileUrl || undefined,
-    hscbFileUrl: undefined,
-    barcodeFileUrl: undefined,
+    labelFileUrl: saved.labelFileUrl,
+    hscbFileUrl: saved.hscbFileUrl,
+    barcodeFileUrl: saved.barcodeFileUrl,
     barcodeResult: undefined,
     contentItems: [],
     totalErrors: saved.totalErrors,

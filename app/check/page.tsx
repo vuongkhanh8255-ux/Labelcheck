@@ -394,7 +394,9 @@ export default function CheckPage() {
                 totalWarnings,
                 totalOk,
                 aiResult: data.result,
-                labelFileUrl: null, // Don't store large base64 in history
+                labelFileUrl: form.labelFile?.name, // Use name instead of large base64
+                hscbFileUrl: form.hscbFile?.name,
+                barcodeFileUrl: form.barcodeFile?.name,
             });
 
             // We need to store the image as base64 for the result page

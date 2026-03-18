@@ -139,14 +139,17 @@ Trả kết quả dưới dạng JSON theo format được chỉ định.
 - Format: [Tên công ty] + [Địa chỉ] + [SĐT] + [Website]
 - Mỗi Brand đã đăng ký với 1 thông tin tổ chức chịu trách nhiệm
 
-### 13. MÃ VẠCH (Bắt buộc) ⚠️ KIỂM TRA RẤT QUAN TRỌNG
+### 13. MÃ VẠCH (Bắt buộc) ⚠️ KIỂM TRA RẤT QUAN TRỌNG VÀ NGHIÊM NGẶT
 - Dùng 100% số và hình
-- ⚠️ PHẢI ĐỌC VÀ SO KHỚP SỐ MÃ VẠCH:
-  + Đọc dãy số dưới mã vạch trên ẢNH NHÃN SẢN PHẨM
-  + Đọc dãy số dưới mã vạch trên ẢNH MÃ VẠCH GỐC (nếu được cung cấp)
-  + SO SÁNH TỪNG SỐ: nếu 2 dãy số KHÁC NHAU → status = "error", ghi rõ 2 số trong note
-  + VD: Nhãn ghi "8936089073500" nhưng file barcode gốc ghi "8936089071971" → PHẢI báo error
-  + Nếu chỉ có 1 nguồn (không có ảnh barcode gốc), kiểm tra hình ảnh mã vạch rõ ràng, đúng format
+- 🚫 KHÔNG ĐƯỢC TỰ ĐỘNG CHO RẰNG HAI MÃ VẠCH GIỐNG NHAU. BẠN PHẢI ĐỌC TỪNG SỐ MỘT.
+- ⚠️ CÁCH KIỂM TRA MÃ VẠCH:
+  Bước 1: TÌM và ĐỌC dãy số mã vạch in trực tiếp trên ẢNH NHÃN SẢN PHẨM. Ghi nhớ dãy số này (VD: 8936089073500).
+  Bước 2: NẾU có ẢNH MÃ VẠCH GỐC (file đính kèm riêng), ĐỌC dãy số trên ảnh đó (VD: 8936089071971).
+  Bước 3: SO SÁNH TỪNG CHỮ SỐ GIỮA BƯỚC 1 VÀ BƯỚC 2.
+- 🚨 NẾU CÓ BẤT KỲ SỰ KHÁC BIỆT NÀO (DÙ CHỈ 1 SỐ) → BẮT BUỘC ĐÁNH DẤU LÀ LỖI ("error").
+  + VD: Nhãn ghi "8936089073517" nhưng file barcode gốc ghi "8936089073500" → PHẢI báo error. KHÔNG được báo "ok".
+- Bạn SẼ BỊ PHẠT NẶNG nếu báo cáo sai lệch kết quả so khớp mã vạch. Đừng bao giờ bịa đặt dữ liệu.
+- Nếu chỉ có 1 nguồn (không có ảnh barcode gốc), kiểm tra hình ảnh mã vạch rõ ràng, đúng format.
 
 ### 14. KÝ HIỆU PAO ("3M", "6M", "12M") (Bắt buộc)
 - Biểu thị thời gian sử dụng sau mở nắp
@@ -185,13 +188,16 @@ Trả kết quả dưới dạng JSON theo format được chỉ định.
 - Khoảng trắng (Quiet Zone): tối thiểu 2mm mỗi bên
 - Tránh đặt ở mép bao bì, nếp gấp, bề mặt cong
 
-## V. ĐỐI CHIẾU VỚI HỒ SƠ CÔNG BỐ (HSCB)
-Nếu được cung cấp ảnh HSCB, BẮT BUỘC phải đối chiếu các thông tin sau:
-- Tên sản phẩm trên nhãn PHẢI KHỚP 100% với tên trong HSCB
-- Thành phần (Ingredients) PHẢI KHỚP với danh sách trong HSCB
-- Số công bố trên nhãn PHẢI KHỚP với số trên HSCB
-- Công dụng PHẢI KHỚP hoặc là phiên bản rút gọn của công dụng trong HSCB
-- Nếu thông tin KHÔNG KHỚP → status = "error", ghi rõ sự khác biệt
+## V. ĐỐI CHIẾU VỚI TÊN SẢN PHẨM NHẬP VÀO & HỒ SƠ CÔNG BỐ (HSCB)
+Đây là bước cực kỳ quan trọng, BẠN KHÔNG ĐƯỢC PHÉP TỰ ĐỘNG KHỚP NẾU CHÚNG KHÁC NHAU.
+1. **So sánh Tên Sản Phẩm:** 
+   - Tên sản phẩm trên Nhãn PHẢI KHỚP TỪNG CHỮ với Tên Sản Phẩm người dùng nhập vào (nếu có).
+   - Tên sản phẩm trên Nhãn PHẢI KHỚP TỪNG CHỮ với Tên Sản Phẩm trong file HSCB (nếu có).
+   - Nếu KHÁC NHAU DÙ CHỈ 1 TỪ (hoặc trật từ, thiếu chữ) → Đánh "error" ngay lập tức cho mục "ten_san_pham" và giải thích rõ ràng. KHÔNG ĐƯỢC TỰ SUY DIỄN RẰNG "Ý NGHĨA GIỐNG NHAU LÀ ĐƯỢC".
+2. **So sánh Thành phần (Ingredients):** PHẢI KHỚP với danh sách trong HSCB.
+3. **So sánh Số Công Bố:** Số trên nhãn PHẢI KHỚP KÝ TỰ với số trên HSCB.
+4. **So sánh Công Dụng:** PHẢI KHỚP ý nghĩa cốt lõi trong HSCB, không thêm bớt công dụng ngoài.
+- Nếu thông tin KHÔNG KHỚP → status = "error", ghi rõ sự khác biệt. Tương tự, ĐỪNG BAO GIỜ BỊA ĐẶT DỮ LIỆU ĐỂ CHO RẰNG CHÚNG KHỚP NHAU.
 `;
 
   const sizeSpecificRules = labelType === '>20ml'

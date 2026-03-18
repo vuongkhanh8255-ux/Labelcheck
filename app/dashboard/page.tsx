@@ -3,11 +3,11 @@
 import Link from 'next/link';
 import { MOCK_BRANDS } from '@/lib/mock-data';
 import { supabase } from '@/lib/supabase';
-import { getCheckSessions, toCheckSession } from '@/lib/check-history';
+import { getCheckSessions, toCheckSession, deleteCheckSession } from '@/lib/check-history';
 import { CheckSession } from '@/types';
 import {
     Plus, CheckCircle2, XCircle, AlertTriangle, Clock,
-    ChevronRight, BarChart3, TrendingUp, Package, Filter
+    ChevronRight, BarChart3, TrendingUp, Package, Filter, Trash2
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
@@ -104,6 +104,14 @@ export default function DashboardPage() {
     const passCount = rawSessions.filter(s => s.status === 'pass').length;
     const failCount = rawSessions.filter(s => s.status === 'fail').length;
     const passRate = rawSessions.length > 0 ? Math.round((passCount / rawSessions.length) * 100) : 0;
+
+    const handleDelete = async (id: string, e: React.MouseEvent) => {
+        e.preventDefault();
+        if (confirm('Bạn có chắc chắn muốn xóa lịch sử kiểm tra này?')) {
+            await deleteCheckSession(id);
+            setRawSessions(prev => prev.filter(s => s.id !== id));
+        }
+    };
 
     return (
         <div style={{ padding: '32px 40px' }}>
@@ -302,23 +310,45 @@ export default function DashboardPage() {
                                         </div>
                                     </td>
                                     <td style={{ padding: '14px 16px' }}>
-                                        <Link href={`/check/${session.id}`} style={{ textDecoration: 'none' }}>
-                                            <button style={{
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '4px',
-                                                padding: '6px 14px',
-                                                background: 'var(--bg-card)',
-                                                border: '1px solid var(--border-light)',
-                                                borderRadius: '8px',
-                                                color: 'var(--text-secondary)',
-                                                fontSize: '13px',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.15s ease',
-                                            }}>
-                                                Xem <ChevronRight size={14} />
+                                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                            <Link href={`/check/${session.id}`} style={{ textDecoration: 'none' }}>
+                                                <button style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                    padding: '6px 14px',
+                                                    background: 'var(--bg-card)',
+                                                    border: '1px solid var(--border-light)',
+                                                    borderRadius: '8px',
+                                                    color: 'var(--text-secondary)',
+                                                    fontSize: '13px',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.15s ease',
+                                                }}>
+                                                    Xem <ChevronRight size={14} />
+                                                </button>
+                                            </Link>
+                                            <button
+                                                onClick={(e) => handleDelete(session.id, e)}
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    width: '28px',
+                                                    height: '28px',
+                                                    background: 'transparent',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    color: 'var(--text-muted)',
+                                                    cursor: 'pointer',
+                                                }}
+                                                onMouseEnter={e => { e.currentTarget.style.background = 'var(--accent-red-glow)'; e.currentTarget.style.color = 'var(--accent-red)'; }}
+                                                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
+                                                title="Xóa"
+                                            >
+                                                <Trash2 size={16} />
                                             </button>
-                                        </Link>
+                                        </div>
                                     </td>
                                 </tr>
                             ))

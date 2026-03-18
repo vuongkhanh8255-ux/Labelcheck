@@ -331,7 +331,37 @@ export default function CheckDetailPage() {
                                 <div>🤖 {session.checkedBy}</div>
                                 <div>📊 {session.totalOk} đạt · {session.totalErrors} lỗi · {session.totalWarnings} cảnh báo</div>
                             </div>
-                            <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                            
+                            {/* Uploaded Files Info */}
+                            {(session.labelFileUrl || session.hscbFileUrl || session.barcodeFileUrl) && (
+                                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '8px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                        File đã upload
+                                    </div>
+                                    <div style={{ fontSize: '12px', display: 'grid', gap: '6px' }}>
+                                        {session.labelFileUrl && (
+                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                                <span style={{ color: 'var(--text-muted)', width: '60px', flexShrink: 0 }}>Nhãn:</span>
+                                                <span style={{ color: 'var(--text-primary)', wordBreak: 'break-all', fontFamily: 'monospace' }}>{session.labelFileUrl}</span>
+                                            </div>
+                                        )}
+                                        {session.hscbFileUrl && (
+                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                                <span style={{ color: 'var(--text-muted)', width: '60px', flexShrink: 0 }}>HSCB:</span>
+                                                <span style={{ color: 'var(--text-primary)', wordBreak: 'break-all', fontFamily: 'monospace' }}>{session.hscbFileUrl}</span>
+                                            </div>
+                                        )}
+                                        {session.barcodeFileUrl && (
+                                            <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                                                <span style={{ color: 'var(--text-muted)', width: '60px', flexShrink: 0 }}>Mã vạch:</span>
+                                                <span style={{ color: 'var(--text-primary)', wordBreak: 'break-all', fontFamily: 'monospace' }}>{session.barcodeFileUrl}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
                                 <Link href="/check" style={{ textDecoration: 'none', flex: 1 }}>
                                     <button style={{
                                         width: '100%',
