@@ -44,6 +44,7 @@ Trả kết quả dưới dạng JSON theo format được chỉ định.
 **3.1. USP Thành phần — Không bắt buộc:**
 - Vị trí trình bày: Phía dưới tên sản phẩm
 - Chỉ được ghi các thành phần có mặt trong bảng thành phần của HSCB (mục 11 - bảng danh sách thành phần)
+- 🚨 Nếu nhãn highlight thành phần (VD: "with Butterfly Pea & Rosemary Extract") mà thành phần đó KHÔNG có trong HSCB mục 11 → status = "error" ngay lập tức
 - Có thể ghi tên chuyển ngữ tiếng Việt của thành phần, khi tra trước ghi tiếng Anh
 - Ngôn ngữ: Tiếng Việt hoặc tiếng Anh
 - Không được highlight thành phần "Tăng cường" khi không có hồ sơ chứng minh
@@ -113,11 +114,18 @@ Trả kết quả dưới dạng JSON theo format được chỉ định.
 - Ngôn ngữ: Tiếng Việt (có thể tiếng Anh)
 - Từ "Cảnh báo" phải dùng đúng "Cảnh báo" KHÔNG DÙNG "Lưu ý" thay thế trong trường hợp có khuyến cáo y tế
 
-### 9. THÀNH PHẦN (Bắt buộc)
-- Dùng 100% với HSCB
+### 9. THÀNH PHẦN (Bắt buộc) ⚠️ KIỂM TRA RẤT QUAN TRỌNG VÀ NGHIÊM NGẶT
+- Dùng 100% với HSCB — danh sách thành phần trên nhãn PHẢI KHỚP HOÀN TOÀN với HSCB mục 11
 - Có thể ghi thêm chuyển ngữ tiếng Việt của thành phần trong ngoặc đơn
-- Check thành phần trong HSCB mục 11 — Bảng danh sách thành phần
+- 🚫 KHÔNG ĐƯỢC TỰ ĐỘNG CHO RẰNG HAI DANH SÁCH THÀNH PHẦN GIỐNG NHAU NẾU CHƯA SO SÁNH TỪNG CÁI
+- ⚠️ CÁCH KIỂM TRA THÀNH PHẦN (khi có HSCB):
+  Bước 1: Đọc TỪNG thành phần trên ảnh nhãn
+  Bước 2: Đọc TỪNG thành phần trong HSCB mục 11
+  Bước 3: So sánh — nếu BẤT KỲ thành phần nào trên nhãn KHÔNG có trong HSCB (theo tên INCI) → status = "error"
+  Bước 4: Nếu HSCB có thành phần mà nhãn KHÔNG liệt kê → status = "error"
+- 🚨 NẾU CÓ BẤT KỲ THÀNH PHẦN NÀO KHÔNG KHỚP (thêm, bớt, hoặc khác tên) → BẮT BUỘC status = "error", ghi rõ tên thành phần sai lệch
 - Check thành phần chuyển ngữ đi đúng với thành phần gốc chưa (nếu có)
+- Bạn SẼ BỊ PHẠT NẶNG nếu báo "ok" khi danh sách thành phần không khớp với HSCB
 
 ### 10. NSX-HSD-Lô SX (Bắt buộc)
 - Dùng cụm "Xem trên bao bì"
@@ -194,7 +202,7 @@ Trả kết quả dưới dạng JSON theo format được chỉ định.
    - Tên sản phẩm trên Nhãn PHẢI KHỚP TỪNG CHỮ với Tên Sản Phẩm người dùng nhập vào (nếu có).
    - Tên sản phẩm trên Nhãn PHẢI KHỚP TỪNG CHỮ với Tên Sản Phẩm trong file HSCB (nếu có).
    - Nếu KHÁC NHAU DÙ CHỈ 1 TỪ (hoặc trật từ, thiếu chữ) → Đánh "error" ngay lập tức cho mục "ten_san_pham" và giải thích rõ ràng. KHÔNG ĐƯỢC TỰ SUY DIỄN RẰNG "Ý NGHĨA GIỐNG NHAU LÀ ĐƯỢC".
-2. **So sánh Thành phần (Ingredients):** PHẢI KHỚP với danh sách trong HSCB.
+2. **So sánh Thành phần (Ingredients):** PHẢI KHỚP HOÀN TOÀN với danh sách trong HSCB mục 11. Liệt kê cụ thể các thành phần thừa/thiếu nếu có sai lệch. Nếu nhãn dùng tên thành phần khác với tên INCI trong HSCB → status = "error" ngay lập tức. ĐỪNG chấp nhận "ý nghĩa tương đương" hay "cùng nguồn gốc" — tên phải giống nhau.
 3. **So sánh Số Công Bố:** Số trên nhãn PHẢI KHỚP KÝ TỰ với số trên HSCB.
 4. **So sánh Công Dụng:** PHẢI KHỚP ý nghĩa cốt lõi trong HSCB, không thêm bớt công dụng ngoài.
 - Nếu thông tin KHÔNG KHỚP → status = "error", ghi rõ sự khác biệt. Tương tự, ĐỪNG BAO GIỜ BỊA ĐẶT DỮ LIỆU ĐỂ CHO RẰNG CHÚNG KHỚP NHAU.
@@ -310,5 +318,7 @@ ${labelType === '>20ml' ? `
 7. Trả lời bằng tiếng Việt
 8. ⚠️ MÃ VẠCH: Nếu có ảnh barcode gốc, BẮT BUỘC đọc số từ CẢ HAI ảnh (nhãn + barcode gốc) và SO SÁNH. Nếu số KHÁC NHAU dù chỉ 1 chữ số → status "error" ngay lập tức.
 9. ⚠️ HSCB: Nếu có ảnh HSCB, đối chiếu TẤT CẢ thông tin. Mọi sai lệch giữa nhãn và HSCB đều là error.
+10. ⚠️ THÀNH PHẦN: So sánh TỪNG thành phần một giữa nhãn và HSCB mục 11. Thành phần thừa, thiếu, hoặc tên khác → "error". Liệt kê CỤ THỂ tên thành phần bị sai trong phần "note". KHÔNG được báo "ok" khi chưa so sánh đầy đủ.
+11. ⚠️ USP THÀNH PHẦN: Kiểm tra tên thành phần được highlight trên nhãn (VD: "with X Extract") có tồn tại trong HSCB mục 11 hay không. Nếu không có → "error".
 `;
 }
