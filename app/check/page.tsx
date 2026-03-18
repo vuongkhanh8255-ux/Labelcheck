@@ -541,15 +541,19 @@ export default function CheckPage() {
                                                 width: '36px',
                                                 height: '36px',
                                                 borderRadius: '8px',
-                                                background: brand.color,
+                                                background: brand.logoUrl ? 'transparent' : brand.color,
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
                                                 fontSize: '14px',
                                                 fontWeight: 800,
                                                 color: 'white',
+                                                overflow: 'hidden',
                                             }}>
-                                                {brand.name[0]}
+                                                {brand.logoUrl
+                                                    ? <img src={brand.logoUrl} alt={brand.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                                    : brand.name[0]
+                                                }
                                             </div>
                                             <span style={{ fontSize: '15px', fontWeight: 700, color: 'var(--text-primary)' }}>{brand.name}</span>
                                         </div>
