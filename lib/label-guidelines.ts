@@ -20,6 +20,11 @@ Trả kết quả dưới dạng JSON theo format được chỉ định.
 - Không có quy định cụ thể về kích cỡ
 - Không được che khuất, làm mờ các nội dung bắt buộc khác
 
+### 1.1. LOGO THƯƠNG HIỆU — ĐỐI CHIẾU VỚI LOGO GỐC (khi có ảnh logo gốc)
+- Nếu được cung cấp ảnh logo gốc của brand: So sánh logo trên nhãn với logo gốc đó
+- 🚨 Nếu logo trên nhãn KHÁC logo gốc (khác hình, khác chữ, hoặc là logo brand khác) → status = "warning", giải thích cụ thể
+- Nếu không có ảnh logo gốc → status = "skipped"
+
 ### 2. TÊN SẢN PHẨM (Bắt buộc)
 **2.1. Tên Chính:**
 - Ghi tiêu chuẩn 100% tên sản phẩm đầy đủ đã đăng ký HSCB
@@ -283,6 +288,7 @@ Bạn PHẢI trả về JSON hợp lệ theo format sau. KHÔNG trả về text,
 ## Danh sách ITEM IDs phải kiểm tra:
 ${labelType === '>20ml' ? `
 - "ten_thuong_hieu" — Tên thương hiệu / Logo
+- "logo_brand" — So sánh logo trên nhãn với logo gốc của brand — nếu không có ảnh logo gốc ghi status "skipped" và note "Không có logo gốc để đối chiếu"
 - "ten_san_pham" — Tên sản phẩm chính
 - "ten_phu" — Tên phụ (dịch Anh/Việt) — nếu không có ghi status "ok" và note "Không bắt buộc"
 - "usp_thanh_phan" — USP thành phần highlight — nếu không có ghi status "ok"
