@@ -272,14 +272,28 @@ export default function CheckPage() {
     const [scanningLabelBarcode, setScanningLabelBarcode] = useState(false);
     const [scanningRefBarcode, setScanningRefBarcode] = useState(false);
 
-    // Auto-scan barcode when label image is uploaded
+    const [labelBarcodeManual, setLabelBarcodeManual] = useState(''); // Manual fallback when ZXing fails
+
+    // HSCB extraction states
+    const [extractingHscb, setExtractingHscb] = useState(false);
+    const [hscbExtracted, setHscbExtracted] = useState<{ productName: string; volume: string; volumeUnit: string; confidence: string } | null>(null);
+    const [hscbExtractError, setHscbExtractError] = useState<string | null>(null);
+
+    // Label extraction states (OCR from label image)
+    const [extractingLabel, setExtractingLabel] = useState(false);
+    const [labelExtracted, setLabelExtracted] = useState<{ productName: string; volume: string; volumeUnit: string; confidence: string } | null>(null);
+    const [labelExtractError, setLabelExtractError] = useState<string | null>(null);
+
+    // Auto-scan barcode + extract text when label image is uploaded
     const handleLabelFileChange = async (f: File | null) => {
         setForm(x => ({ ...x, labelFile: f }));
         setLabelBarcodeNumber(null);
+        setLabelExtracted(null);
+        setLabelExtractError(null);
         if (f) {
+            // Scan barcode
             setScanningLabelBarcode(true);
             try {
-                // Convert PDF to image if needed, then scan
                 const imageFile = await ensureImageFile(f);
                 const detected = await decodeBarcodeFromFile(imageFile);
                 setLabelBarcodeNumber(detected);
@@ -287,6 +301,30 @@ export default function CheckPage() {
                 console.warn('Label barcode scan failed:', err);
             } finally {
                 setScanningLabelBarcode(false);
+            }
+
+            // Extract product name & volume from label via OCR
+            setExtractingLabel(true);
+            try {
+                let imageFile = await ensureImageFile(f);
+                imageFile = await compressImage(imageFile, 1200, 0.7);
+                const fd = new FormData();
+                fd.append('labelFile', imageFile);
+                const res = await fetch('/api/extract-label', { method: 'POST', body: fd });
+                const contentType = res.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) {
+                    throw new Error('Server trả về format không hợp lệ');
+                }
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Lỗi trích xuất');
+                if (data.success && data.data) {
+                    setLabelExtracted(data.data);
+                }
+            } catch (err) {
+                console.warn('Label extraction failed:', err);
+                setLabelExtractError(err instanceof Error ? err.message : 'Lỗi trích xuất nhãn');
+            } finally {
+                setExtractingLabel(false);
             }
         }
     };
@@ -392,8 +430,17 @@ export default function CheckPage() {
             if (effectiveBarcodeRef) {
                 formData.append('barcodeRef', effectiveBarcodeRef);
             }
-            if (labelBarcodeNumber) {
-                formData.append('labelBarcodeScanned', labelBarcodeNumber);
+            // Use ZXing result, or manual input as fallback
+            const effectiveLabelBarcode = labelBarcodeNumber || labelBarcodeManual || '';
+            if (effectiveLabelBarcode) {
+                formData.append('labelBarcodeScanned', effectiveLabelBarcode);
+            }
+            // Send extracted label text (OCR) so GPT compares text-to-text
+            if (labelExtracted?.productName) {
+                formData.append('labelProductName', labelExtracted.productName);
+            }
+            if (labelExtracted?.volume) {
+                formData.append('labelVolume', `${labelExtracted.volume} ${labelExtracted.volumeUnit || 'ml'}`);
             }
 
             const response = await fetch('/api/analyze-label', {
@@ -697,11 +744,78 @@ export default function CheckPage() {
                                                 </span>
                                             </>
                                         ) : (
-                                            <>
-                                                <AlertTriangle size={14} color="rgb(245, 158, 11)" />
-                                                <span style={{ fontSize: '12px', color: 'rgb(245, 158, 11)' }}>Không quét được mã vạch từ nhãn (AI sẽ đọc thay)</span>
-                                            </>
+                                            <div style={{ width: '100%' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                                    <AlertTriangle size={14} color="rgb(245, 158, 11)" />
+                                                    <span style={{ fontSize: '12px', color: 'rgb(245, 158, 11)' }}>Không quét được mã vạch tự động — nhập số mã vạch in trên nhãn:</span>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    value={labelBarcodeManual}
+                                                    onChange={e => setLabelBarcodeManual(e.target.value.replace(/\D/g, ''))}
+                                                    placeholder="Nhập số in dưới mã vạch trên nhãn (VD: 8936237960201)"
+                                                    style={{
+                                                        width: '100%',
+                                                        padding: '8px 12px',
+                                                        background: 'var(--bg-primary)',
+                                                        border: '1px solid var(--border-light)',
+                                                        borderRadius: '6px',
+                                                        color: 'var(--text-primary)',
+                                                        fontSize: '13px',
+                                                        fontFamily: 'monospace',
+                                                        letterSpacing: '1px',
+                                                        outline: 'none',
+                                                    }}
+                                                />
+                                            </div>
                                         )}
+                                    </div>
+                                )}
+                                {/* Label text extraction status */}
+                                {form.labelFile && (
+                                    <div style={{
+                                        padding: '8px 12px',
+                                        borderRadius: '8px',
+                                        background: extractingLabel ? 'var(--bg-secondary)' :
+                                            labelExtracted ? 'rgba(16, 185, 129, 0.08)' :
+                                            labelExtractError ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
+                                        border: `1px solid ${extractingLabel ? 'var(--border)' :
+                                            labelExtracted ? 'rgba(16, 185, 129, 0.3)' :
+                                            labelExtractError ? 'rgba(239, 68, 68, 0.3)' : 'transparent'}`,
+                                        marginTop: '-8px',
+                                    }}>
+                                        {extractingLabel ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>AI đang đọc tên SP & dung tích từ nhãn...</span>
+                                            </div>
+                                        ) : labelExtracted ? (
+                                            <div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                                    <CheckCircle size={14} color="var(--accent-green)" />
+                                                    <span style={{ fontSize: '12px', color: 'var(--accent-green)', fontWeight: 600 }}>
+                                                        Đã trích xuất từ nhãn (Độ tin cậy: {labelExtracted.confidence === 'high' ? 'Cao' : labelExtracted.confidence === 'medium' ? 'Trung bình' : 'Thấp'})
+                                                    </span>
+                                                </div>
+                                                {labelExtracted.productName && (
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginLeft: '22px', marginTop: '2px' }}>
+                                                        Tên SP trên nhãn: <strong>{labelExtracted.productName}</strong>
+                                                    </div>
+                                                )}
+                                                {labelExtracted.volume && (
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginLeft: '22px', marginTop: '2px' }}>
+                                                        Dung tích trên nhãn: <strong>{labelExtracted.volume} {labelExtracted.volumeUnit}</strong>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : labelExtractError ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <AlertTriangle size={14} color="var(--accent-red)" />
+                                                <span style={{ fontSize: '12px', color: 'var(--accent-red)' }}>
+                                                    Không trích xuất được từ nhãn: {labelExtractError} — AI sẽ đọc trực tiếp từ ảnh
+                                                </span>
+                                            </div>
+                                        ) : null}
                                     </div>
                                 )}
 
@@ -709,10 +823,101 @@ export default function CheckPage() {
                                     label="📋 File HSCB — Hồ sơ công bố"
                                     accept=".pdf,.png,.jpg,.jpeg"
                                     file={form.hscbFile}
-                                    onFile={f => setForm(x => ({ ...x, hscbFile: f }))}
+                                    onFile={async (f) => {
+                                        setForm(x => ({ ...x, hscbFile: f }));
+                                        setHscbExtracted(null);
+                                        setHscbExtractError(null);
+                                        if (f) {
+                                            setExtractingHscb(true);
+                                            try {
+                                                // Convert PDF to image if needed, then compress for API
+                                                let imageFile = await ensureImageFile(f);
+                                                imageFile = await compressImage(imageFile, 1200, 0.7);
+                                                const fd = new FormData();
+                                                fd.append('hscbFile', imageFile);
+                                                const res = await fetch('/api/extract-hscb', { method: 'POST', body: fd });
+                                                const contentType = res.headers.get('content-type') || '';
+                                                if (!contentType.includes('application/json')) {
+                                                    throw new Error('Server trả về format không hợp lệ');
+                                                }
+                                                const data = await res.json();
+                                                if (!res.ok) throw new Error(data.error || 'Lỗi trích xuất');
+                                                if (data.success && data.data) {
+                                                    setHscbExtracted(data.data);
+                                                    // Auto-fill product name if field is empty or user confirms
+                                                    if (data.data.productName) {
+                                                        setForm(x => ({
+                                                            ...x,
+                                                            productName: data.data.productName,
+                                                        }));
+                                                    }
+                                                    // Auto-fill volume if field is empty
+                                                    if (data.data.volume) {
+                                                        setForm(x => ({
+                                                            ...x,
+                                                            volume: data.data.volume,
+                                                            unit: (data.data.volumeUnit === 'g' ? 'g' : 'ml') as 'ml' | 'g',
+                                                        }));
+                                                    }
+                                                }
+                                            } catch (err) {
+                                                console.warn('HSCB extraction failed:', err);
+                                                setHscbExtractError(err instanceof Error ? err.message : 'Lỗi trích xuất HSCB');
+                                            } finally {
+                                                setExtractingHscb(false);
+                                            }
+                                        }
+                                    }}
                                     icon={FileText}
-                                    hint="Chấp nhận PDF, PNG, JPG"
+                                    hint="Chấp nhận PDF, PNG, JPG — AI sẽ tự đọc tên SP & dung tích"
                                 />
+                                {/* HSCB extraction status */}
+                                {form.hscbFile && (
+                                    <div style={{
+                                        padding: '8px 12px',
+                                        borderRadius: '8px',
+                                        background: extractingHscb ? 'var(--bg-secondary)' :
+                                            hscbExtracted ? 'rgba(16, 185, 129, 0.08)' :
+                                            hscbExtractError ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
+                                        border: `1px solid ${extractingHscb ? 'var(--border)' :
+                                            hscbExtracted ? 'rgba(16, 185, 129, 0.3)' :
+                                            hscbExtractError ? 'rgba(239, 68, 68, 0.3)' : 'transparent'}`,
+                                        marginTop: '-8px',
+                                    }}>
+                                        {extractingHscb ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                                                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>AI đang đọc HSCB để trích xuất tên SP & dung tích...</span>
+                                            </div>
+                                        ) : hscbExtracted ? (
+                                            <div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                                    <CheckCircle size={14} color="var(--accent-green)" />
+                                                    <span style={{ fontSize: '12px', color: 'var(--accent-green)', fontWeight: 600 }}>
+                                                        Đã tự động điền từ HSCB (Độ tin cậy: {hscbExtracted.confidence === 'high' ? 'Cao' : hscbExtracted.confidence === 'medium' ? 'Trung bình' : 'Thấp'})
+                                                    </span>
+                                                </div>
+                                                {hscbExtracted.productName && (
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginLeft: '22px', marginTop: '2px' }}>
+                                                        Tên SP: <strong>{hscbExtracted.productName}</strong>
+                                                    </div>
+                                                )}
+                                                {hscbExtracted.volume && (
+                                                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginLeft: '22px', marginTop: '2px' }}>
+                                                        Dung tích: <strong>{hscbExtracted.volume} {hscbExtracted.volumeUnit}</strong>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : hscbExtractError ? (
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <AlertTriangle size={14} color="var(--accent-red)" />
+                                                <span style={{ fontSize: '12px', color: 'var(--accent-red)' }}>
+                                                    Không trích xuất được: {hscbExtractError} — vui lòng nhập thủ công
+                                                </span>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                )}
                                 <FileUploadZone
                                     label="🔲 File mã vạch gốc (dùng để so khớp số + kiểm tra chất lượng in)"
                                     accept=".pdf,.png,.jpg,.jpeg"

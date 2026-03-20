@@ -34,6 +34,8 @@ export async function POST(request: NextRequest) {
     const brandInfo = formData.get('brandInfo') as string;
     const barcodeRef = (formData.get('barcodeRef') as string) || ''; // Số mã vạch gốc (quét tự động hoặc nhập tay)
     const labelBarcodeScanned = (formData.get('labelBarcodeScanned') as string) || ''; // Số mã vạch quét từ nhãn bằng ZXing
+    const labelProductName = (formData.get('labelProductName') as string) || ''; // Tên SP trích xuất từ nhãn bằng OCR
+    const labelVolume = (formData.get('labelVolume') as string) || ''; // Dung tích trích xuất từ nhãn bằng OCR
 
     if (!labelFile) {
       return NextResponse.json(
@@ -88,6 +90,8 @@ export async function POST(request: NextRequest) {
           brandInfo,
           barcodeRef,
           labelBarcodeScanned,
+          labelProductName,
+          labelVolume,
         }),
       },
     ];
@@ -156,6 +160,8 @@ interface ContentParams {
   brandInfo: string;
   barcodeRef: string; // Số mã vạch gốc (quét từ file hoặc nhập tay)
   labelBarcodeScanned: string; // Số mã vạch quét từ nhãn bằng ZXing
+  labelProductName: string; // Tên SP trích xuất từ nhãn bằng OCR riêng
+  labelVolume: string; // Dung tích trích xuất từ nhãn bằng OCR riêng
 }
 
 function buildUserContent(p: ContentParams): OpenAI.Chat.Completions.ChatCompletionContentPart[] {
@@ -172,11 +178,33 @@ function buildUserContent(p: ContentParams): OpenAI.Chat.Completions.ChatComplet
 
 🚨 SO SÁNH BẮT BUỘC — ĐỌC KỸ TRƯỚC KHI PHÂN TÍCH:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-① TÊN SẢN PHẨM CHÍNH XÁC (người dùng nhập, tin 100%):
+① TÊN SẢN PHẨM — VÒNG 1: SO SÁNH VĂN BẢN VỚI VĂN BẢN (item id: "ten_san_pham"):
+   Tên trên HSCB (người dùng nhập, tin 100%):
    "${p.productName}"
-   → Đọc tên từ nhãn → So sánh TỪNG KÝ TỰ với chuỗi trên (kể cả dấu phẩy, gạch ngang, khoảng trắng).
+${p.labelProductName ? `   Tên trên nhãn (đã trích xuất bằng OCR riêng, tin 100%):
+   "${p.labelProductName}"
+   → KHÔNG đọc lại tên từ ảnh nhãn. Sử dụng CHÍNH XÁC hai chuỗi văn bản trên để so sánh.
+   → So sánh TỪNG KÝ TỰ, kể cả dấu câu (dấu phẩy, dấu gạch ngang, dấu chấm, khoảng trắng).
+   → Bất kỳ khác biệt nào (thiếu/thêm/sai ký tự hoặc dấu câu) → status = "error" ngay lập tức.
+   → KHÔNG ĐƯỢC suy diễn "ý nghĩa giống nhau là được".` : `   → Chưa trích xuất được tên từ nhãn bằng OCR. Hãy đọc tên từ ảnh nhãn → So sánh TỪNG KÝ TỰ với chuỗi HSCB trên.
    → Nếu nhãn thiếu/thêm/sai bất kỳ ký tự hoặc dấu câu nào → status = "error" ngay lập tức.
-   → KHÔNG ĐƯỢC suy diễn "ý nghĩa giống nhau là được".
+   → KHÔNG ĐƯỢC suy diễn "ý nghĩa giống nhau là được".`}
+
+①bis TÊN SẢN PHẨM — VÒNG 2: ĐỐI CHIẾU TRỰC TIẾP TỪ ẢNH NHÃN (item id: "ten_san_pham_doi_chieu_anh"):
+   Đây là bước kiểm tra BỔ SUNG, KHÔNG phụ thuộc vào kết quả OCR ở vòng 1.
+   → Nhìn trực tiếp vào ẢNH NHÃN SẢN PHẨM (Ảnh 1).
+   → Đọc TẤT CẢ các dòng chữ tạo thành tên sản phẩm trên ảnh (tên tiếng Anh, tên dòng SP, loại SP, tên tiếng Việt, mô tả công dụng).
+   → Ghép tất cả thành một chuỗi đầy đủ.
+   → So sánh TỪNG KÝ TỰ (kể cả dấu câu) với tên HSCB: "${p.productName}"
+   → Nếu có BẤT KỲ khác biệt nào → status = "error", ghi rõ ký tự/dấu câu khác nhau.
+   → Trong field "found": ghi CHÍNH XÁC chuỗi tên đọc được từ ảnh.
+   → Trong field "expected": ghi tên từ HSCB.
+   → Mục đích: Xác nhận kết quả OCR vòng 1, phát hiện lỗi OCR bỏ sót.
+${p.labelVolume ? `
+① bis. DUNG TÍCH/KHỐI LƯỢNG — SO SÁNH VĂN BẢN VỚI VĂN BẢN:
+   Dung tích trên HSCB: "${p.volume}"
+   Dung tích trên nhãn (đã trích xuất bằng OCR riêng): "${p.labelVolume}"
+   → So sánh hai giá trị trên. Nếu khác → status = "error".` : ''}
 ${p.barcodeRef ? `
 ② SỐ MÃ VẠCH GỐC (quét tự động từ file barcode, tin 100%):
    "${p.barcodeRef}"` : ''}
@@ -189,8 +217,13 @@ ${p.barcodeRef && p.labelBarcodeScanned ? `
    → ${p.labelBarcodeScanned === p.barcodeRef ? 'KHỚP ✓ → numberMatch = "ok"' : 'KHÔNG KHỚP ✗ → numberMatch = "error" — BẮT BUỘC'}
    → Sử dụng CHÍNH XÁC hai số trên cho labelBarcodeNumber và uploadedBarcodeNumber. KHÔNG ĐỌC LẠI TỪ ẢNH.` : ''}
 ${p.barcodeRef && !p.labelBarcodeScanned ? `
-   → Phần mềm không quét được barcode từ nhãn. Bạn PHẢI đọc số từ ảnh nhãn (ảnh 1) và so sánh với "${p.barcodeRef}".
-   → Nếu khác dù 1 chữ số → numberMatch = "error".` : ''}
+⚠️ BARCODE NHÃN KHÔNG QUÉT ĐƯỢC:
+   → Phần mềm KHÔNG quét được barcode từ nhãn.
+   → BẠN PHẢI đọc CÁC SỐ IN BÊN DƯỚI các vạch barcode trên nhãn (ảnh 1). Đây là dãy 13 chữ số (EAN-13) in rõ ràng bên dưới các vạch đen trắng.
+   → TUYỆT ĐỐI KHÔNG copy/lặp lại số barcode gốc "${p.barcodeRef}".
+   → TUYỆT ĐỐI KHÔNG đoán hoặc bịa số. Chỉ ghi số bạn thực sự nhìn thấy in trên nhãn.
+   → Nếu không nhìn rõ số trên nhãn → ghi labelBarcodeNumber = "KHÔNG ĐỌC ĐƯỢC" và numberMatch = "error", numberNote = "Không đọc được số mã vạch trên nhãn"
+   → Nếu đọc được số → so sánh với "${p.barcodeRef}". Khác dù 1 chữ số → numberMatch = "error".` : ''}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `;
 
