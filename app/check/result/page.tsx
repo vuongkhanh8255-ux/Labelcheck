@@ -11,9 +11,10 @@ import {
 
 // Highlight differences between expected and found text
 function highlightDiff(expected: string, found: string): React.ReactNode {
-    const expWords = expected.toUpperCase().replace(/[,\-–]/g, m => ` ${m} `).split(/\s+/).filter(Boolean);
-    const foundWords = found.toUpperCase().replace(/[,\-–]/g, m => ` ${m} `).split(/\s+/).filter(Boolean);
-    const foundOriginal = found.replace(/[,\-–]/g, m => ` ${m} `).split(/\s+/).filter(Boolean);
+    const splitRegex = /([,.\-–()[\]{}!?:;"'])/g;
+    const expWords = expected.toUpperCase().replace(splitRegex, m => ` ${m} `).split(/\s+/).filter(Boolean);
+    const foundWords = found.toUpperCase().replace(splitRegex, m => ` ${m} `).split(/\s+/).filter(Boolean);
+    const foundOriginal = found.replace(splitRegex, m => ` ${m} `).split(/\s+/).filter(Boolean);
     const expSet = new Set(expWords);
 
     // Find words/punctuation in found that differ from expected

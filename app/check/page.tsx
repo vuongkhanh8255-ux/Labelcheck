@@ -479,40 +479,71 @@ export default function CheckPage() {
                 formData.append('hscbIngredients', hscbExtracted.ingredients);
             }
 
-            // === DUAL AI: Gọi GPT-4o + Gemini SONG SONG ===
+            // === DUAL AI: Clone FormData cho Gemini (vì FormData có thể chỉ đọc 1 lần) ===
+            const formData2 = new FormData();
+            for (const [key, value] of formData.entries()) {
+                formData2.append(key, value);
+            }
+
             const [gptResponse, geminiResponse] = await Promise.allSettled([
                 fetch('/api/analyze-label', { method: 'POST', body: formData }),
-                fetch('/api/analyze-label-gemini', { method: 'POST', body: formData }),
+                fetch('/api/analyze-label-gemini', { method: 'POST', body: formData2 }),
             ]);
 
             // Parse GPT result
             let gptData: Record<string, unknown> | null = null;
+            let gptErrorMsg = '';
             if (gptResponse.status === 'fulfilled') {
                 const res = gptResponse.value;
-                const ct = res.headers.get('content-type') || '';
-                if (ct.includes('application/json')) {
-                    const json = await res.json();
-                    if (res.ok && json.result) gptData = json;
+                try {
+                    const ct = res.headers.get('content-type') || '';
+                    if (ct.includes('application/json')) {
+                        const json = await res.json();
+                        if (res.ok && json.result) {
+                            gptData = json;
+                        } else {
+                            gptErrorMsg = json.error || `HTTP ${res.status}`;
+                        }
+                    } else {
+                        const text = await res.text();
+                        gptErrorMsg = `Non-JSON response: ${text.substring(0, 100)}`;
+                    }
+                } catch (e) {
+                    gptErrorMsg = e instanceof Error ? e.message : 'Parse error';
                 }
+            } else {
+                gptErrorMsg = gptResponse.reason?.message || 'Network error';
             }
 
             // Parse Gemini result
             let geminiData: Record<string, unknown> | null = null;
+            let geminiErrorMsg = '';
             if (geminiResponse.status === 'fulfilled') {
                 const res = geminiResponse.value;
-                const ct = res.headers.get('content-type') || '';
-                if (ct.includes('application/json')) {
-                    const json = await res.json();
-                    if (res.ok && json.result) geminiData = json;
+                try {
+                    const ct = res.headers.get('content-type') || '';
+                    if (ct.includes('application/json')) {
+                        const json = await res.json();
+                        if (res.ok && json.result) {
+                            geminiData = json;
+                        } else {
+                            geminiErrorMsg = json.error || `HTTP ${res.status}`;
+                        }
+                    } else {
+                        const text = await res.text();
+                        geminiErrorMsg = `Non-JSON response: ${text.substring(0, 100)}`;
+                    }
+                } catch (e) {
+                    geminiErrorMsg = e instanceof Error ? e.message : 'Parse error';
                 }
+            } else {
+                geminiErrorMsg = geminiResponse.reason?.message || 'Network error';
             }
 
             // At least one must succeed
             const primaryData = gptData || geminiData;
             if (!primaryData) {
-                const gptErr = gptResponse.status === 'rejected' ? gptResponse.reason?.message : 'Unknown';
-                const geminiErr = geminiResponse.status === 'rejected' ? geminiResponse.reason?.message : 'Unknown';  
-                throw new Error(`Cả 2 AI đều thất bại. GPT: ${gptErr} | Gemini: ${geminiErr}`);
+                throw new Error(`Cả 2 AI đều thất bại.\nGPT: ${gptErrorMsg}\nGemini: ${geminiErrorMsg}`);
             }
 
             const data = primaryData;
