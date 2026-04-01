@@ -261,7 +261,7 @@ export async function POST(request: NextRequest) {
     const ai = getGeminiClient();
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-pro-preview-05-06',
+      model: 'gemini-1.5-pro',
       contents: [{ role: 'user', parts }],
       config: {
         temperature: 0.1,
@@ -327,7 +327,7 @@ Trả về JSON thuần:
 
       try {
         const verifyResponse = await ai.models.generateContent({
-          model: 'gemini-2.5-pro-preview-05-06',
+          model: 'gemini-1.5-pro',
           contents: [{ role: 'user', parts: verifyParts }],
           config: {
             temperature: 0.1,
@@ -380,7 +380,7 @@ Trả về JSON thuần:
     return NextResponse.json({
       success: true,
       result: parsed,
-      model: 'gemini-2.5-pro',
+      model: 'gemini-1.5-pro',
       usage: response.usageMetadata || null,
     });
   } catch (error: unknown) {

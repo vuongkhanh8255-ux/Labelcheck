@@ -240,7 +240,9 @@ function ContentSection({ title, items, onAccept, geminiItems }: {
                                             color: item.status === 'error' ? 'var(--accent-red)' : 'var(--accent-yellow)',
                                             marginTop: '4px',
                                         }}>
-                                            <span style={{ fontSize: '10px', color: 'var(--accent-orange)', fontWeight: 600 }}>🟠 GPT: </span>
+                                            <span style={{ fontSize: '10px', color: 'var(--accent-orange)', fontWeight: 600 }}>
+                                                {geminiItem && !disagreement?.hasDisagreement ? '🟠🔵 GPT & Gemini đồng thuận: ' : '🟠 GPT: '}
+                                            </span>
                                             {renderNote(item.note, item.status)}
                                         </div>
                                     )}
