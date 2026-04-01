@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import { getCheckSessionById, SavedCheckSession } from '@/lib/check-history';
+import { getCheckSessionById, getCheckSessionByIdFromSupabase, SavedCheckSession } from '@/lib/check-history';
 import {
     ArrowLeft, CheckCircle2, XCircle, AlertTriangle, MinusCircle,
-    Info, Bot, RotateCcw, ChevronDown, ChevronUp
+    Info, Bot, RotateCcw, ChevronDown, ChevronUp, Maximize2, X
 } from 'lucide-react';
 
 interface AICheckItem {
@@ -99,13 +99,34 @@ export default function CheckDetailPage() {
     const id = params.id as string;
     const [session, setSession] = useState<SavedCheckSession | null>(null);
     const [loading, setLoading] = useState(true);
+    const [showCompare, setShowCompare] = useState(false);
+
+    // Close compare modal with ESC key
+    useEffect(() => {
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setShowCompare(false);
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, []);
 
     useEffect(() => {
-        const saved = getCheckSessionById(id);
-        if (saved) {
-            setSession(saved);
+        async function load() {
+            // Try localStorage first
+            const saved = getCheckSessionById(id);
+            if (saved) {
+                setSession(saved);
+                setLoading(false);
+                return;
+            }
+            // Fallback to Supabase
+            const fromSupabase = await getCheckSessionByIdFromSupabase(id);
+            if (fromSupabase) {
+                setSession(fromSupabase);
+            }
+            setLoading(false);
         }
-        setLoading(false);
+        load();
     }, [id]);
 
     if (loading) {
@@ -225,6 +246,152 @@ export default function CheckDetailPage() {
                     background: 'var(--bg-secondary)',
                 }}>
                     <div style={{ flex: 1, padding: '20px', overflow: 'auto' }}>
+                        {/* Label + HSCB Images */}
+                        <div style={{
+                            padding: '16px',
+                            background: 'var(--bg-card)',
+                            border: '1px solid var(--border)',
+                            borderRadius: '12px',
+                            marginBottom: '16px',
+                        }}>
+                            <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '12px' }}>
+                                📋 Thông tin ký duyệt sản phẩm
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>Nhãn sản phẩm</div>
+                                    {session.labelFileUrl && (session.labelFileUrl.startsWith('data:') || session.labelFileUrl.startsWith('blob:')) ? (
+                                        <img src={session.labelFileUrl} alt="Nhãn sản phẩm" style={{
+                                            width: '100%', borderRadius: '8px', border: '1px solid var(--border)',
+                                            cursor: 'pointer', maxHeight: '300px', objectFit: 'contain', background: '#f9f9f9',
+                                        }} onClick={() => window.open(session.labelFileUrl!, '_blank')} />
+                                    ) : (
+                                        <div style={{ padding: '24px', textAlign: 'center', background: '#f9f9f9', borderRadius: '8px', border: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: '12px' }}>
+                                            Ảnh nhãn: {session.labelFileUrl || 'Không có'}
+                                        </div>
+                                    )}
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>Hồ sơ công bố (HSCB)</div>
+                                    {session.hscbFileUrl && (session.hscbFileUrl.startsWith('data:') || session.hscbFileUrl.startsWith('blob:')) ? (
+                                        <img src={session.hscbFileUrl} alt="HSCB" style={{
+                                            width: '100%', borderRadius: '8px', border: '1px solid var(--border)',
+                                            cursor: 'pointer', maxHeight: '300px', objectFit: 'contain', background: '#f9f9f9',
+                                        }} onClick={() => window.open(session.hscbFileUrl!, '_blank')} />
+                                    ) : (
+                                        <div style={{ padding: '24px', textAlign: 'center', background: '#f9f9f9', borderRadius: '8px', border: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: '12px' }}>
+                                            HSCB: {session.hscbFileUrl || 'Không có'}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Compare fullscreen button */}
+                            <button
+                                onClick={() => setShowCompare(true)}
+                                style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                    width: '100%', padding: '10px', marginTop: '8px',
+                                    background: '#3b82f6', color: 'white',
+                                    border: 'none', borderRadius: '8px', cursor: 'pointer',
+                                    fontSize: '13px', fontWeight: 600,
+                                    transition: 'opacity 0.2s',
+                                }}
+                                onMouseEnter={e => (e.currentTarget.style.opacity = '0.85')}
+                                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+                            >
+                                <Maximize2 size={16} />
+                                Phóng to so sánh Nhãn vs HSCB
+                            </button>
+                        </div>
+
+                        {/* Fullscreen Compare Modal */}
+                        {showCompare && (
+                            <div style={{
+                                position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                                background: 'rgba(0,0,0,0.92)', zIndex: 9999,
+                                display: 'flex', flexDirection: 'column',
+                            }}>
+                                {/* Header bar */}
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                    padding: '12px 20px', background: 'rgba(255,255,255,0.08)',
+                                    borderBottom: '1px solid rgba(255,255,255,0.15)',
+                                }}>
+                                    <div style={{ display: 'flex', gap: '24px' }}>
+                                        <span style={{ color: '#60a5fa', fontWeight: 700, fontSize: '14px' }}>📋 Nhãn sản phẩm</span>
+                                        <span style={{ color: '#f59e0b', fontWeight: 700, fontSize: '14px' }}>📄 Hồ sơ công bố (HSCB)</span>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowCompare(false)}
+                                        style={{
+                                            background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
+                                            color: 'white', cursor: 'pointer', padding: '8px 16px',
+                                            display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px',
+                                        }}
+                                    >
+                                        <X size={16} /> Đóng (ESC)
+                                    </button>
+                                </div>
+                                {/* Split view */}
+                                <div style={{
+                                    flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr',
+                                    gap: '4px', padding: '8px', overflow: 'hidden',
+                                }}>
+                                    {/* Label side */}
+                                    <div style={{
+                                        overflow: 'auto', background: '#1a1a2e', borderRadius: '8px',
+                                        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+                                        padding: '12px',
+                                    }}>
+                                        <img
+                                            src={session.labelFileUrl || ''}
+                                            alt="Nhãn sản phẩm"
+                                            style={{
+                                                maxWidth: '100%', maxHeight: '100%', objectFit: 'contain',
+                                                borderRadius: '4px', cursor: 'zoom-in',
+                                            }}
+                                            onClick={e => {
+                                                const img = e.currentTarget;
+                                                if (img.style.maxWidth === 'none') {
+                                                    img.style.maxWidth = '100%';
+                                                    img.style.cursor = 'zoom-in';
+                                                } else {
+                                                    img.style.maxWidth = 'none';
+                                                    img.style.cursor = 'zoom-out';
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    {/* HSCB side */}
+                                    <div style={{
+                                        overflow: 'auto', background: '#1a1a2e', borderRadius: '8px',
+                                        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+                                        padding: '12px',
+                                    }}>
+                                        <img
+                                            src={session.hscbFileUrl || ''}
+                                            alt="HSCB"
+                                            style={{
+                                                maxWidth: '100%', maxHeight: '100%', objectFit: 'contain',
+                                                borderRadius: '4px', cursor: 'zoom-in',
+                                            }}
+                                            onClick={e => {
+                                                const img = e.currentTarget;
+                                                if (img.style.maxWidth === 'none') {
+                                                    img.style.maxWidth = '100%';
+                                                    img.style.cursor = 'zoom-in';
+                                                } else {
+                                                    img.style.maxWidth = 'none';
+                                                    img.style.cursor = 'zoom-out';
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* AI Summary Card */}
                         {summary && (
                             <div style={{

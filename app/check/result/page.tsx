@@ -9,6 +9,86 @@ import {
     ChevronDown, ChevronUp
 } from 'lucide-react';
 
+// Highlight differences between expected and found text
+function highlightDiff(expected: string, found: string): React.ReactNode {
+    const expWords = expected.toUpperCase().replace(/[,\-–]/g, m => ` ${m} `).split(/\s+/).filter(Boolean);
+    const foundWords = found.toUpperCase().replace(/[,\-–]/g, m => ` ${m} `).split(/\s+/).filter(Boolean);
+    const foundOriginal = found.replace(/[,\-–]/g, m => ` ${m} `).split(/\s+/).filter(Boolean);
+    const expSet = new Set(expWords);
+
+    // Find words/punctuation in found that differ from expected
+    const result: React.ReactNode[] = [];
+    let fi = 0;
+    let ei = 0;
+
+    for (let i = 0; i < foundOriginal.length; i++) {
+        const fw = foundWords[i];
+        // Check if this word exists at the right position in expected
+        const isMatch = ei < expWords.length && expWords[ei] === fw;
+
+        if (isMatch) {
+            result.push(<span key={i}>{foundOriginal[i]} </span>);
+            ei++;
+        } else {
+            // Check if word exists anywhere in expected
+            if (expSet.has(fw)) {
+                result.push(<span key={i}>{foundOriginal[i]} </span>);
+                // Try to advance expected index
+                const nextIdx = expWords.indexOf(fw, ei);
+                if (nextIdx >= 0) ei = nextIdx + 1;
+            } else {
+                // Word not in expected — highlight red
+                result.push(
+                    <span key={i} style={{ color: '#dc2626', fontWeight: 700, textDecoration: 'underline', textDecorationStyle: 'wavy' as const }}>
+                        {foundOriginal[i]}{' '}
+                    </span>
+                );
+            }
+        }
+    }
+
+    // Check for missing words in expected that aren't in found
+    const foundSet = new Set(foundWords);
+    const missing = expWords.filter(w => !foundSet.has(w));
+    if (missing.length > 0) {
+        result.push(
+            <span key="missing" style={{ color: '#dc2626', fontWeight: 700, marginLeft: '4px' }}>
+                [THIẾU: {missing.join(', ')}]
+            </span>
+        );
+    }
+
+    return <>{result}</>;
+}
+
+// Render note with numbered items on separate lines
+function renderNote(note: string, status: string): React.ReactNode {
+    const color = status === 'error' ? 'var(--accent-red)' : 'var(--accent-yellow)';
+    // Split by numbered pattern: "1. ...", "2. ..." etc
+    const parts = note.split(/(?=\d+\.\s)/);
+
+    if (parts.length <= 1) {
+        // Single note, no numbering
+        return (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+                <Info size={12} style={{ marginTop: '2px', flexShrink: 0 }} />
+                <span>{note}</span>
+            </div>
+        );
+    }
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {parts.filter(p => p.trim()).map((part, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+                    <Info size={12} style={{ marginTop: '2px', flexShrink: 0, color }} />
+                    <span>{part.trim()}</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 interface AICheckItem {
     id: string;
     field: string;
@@ -47,14 +127,25 @@ interface AIResult {
 
 interface ResultPayload {
     aiResult: AIResult;
+    geminiResult?: AIResult | null;
     productName: string;
     brandName: string;
     labelType: '>20ml' | '<20ml';
     volume: string;
     volumeFormatted: string;
     labelFileUrl: string | null;
+    hscbFileUrl?: string | null;
     createdAt: string;
     usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number };
+}
+
+// Check if GPT and Gemini disagree on a specific item
+function getDisagreement(itemId: string, gptItems: AICheckItem[], geminiItems: AICheckItem[]): { hasDisagreement: boolean; gptStatus: string; geminiStatus: string; geminiNote: string } {
+    const gptItem = gptItems.find(i => i.id === itemId);
+    const geminiItem = geminiItems.find(i => i.id === itemId);
+    if (!gptItem || !geminiItem) return { hasDisagreement: false, gptStatus: gptItem?.status || '', geminiStatus: geminiItem?.status || '', geminiNote: '' };
+    const disagree = gptItem.status !== geminiItem.status;
+    return { hasDisagreement: disagree, gptStatus: gptItem.status, geminiStatus: geminiItem.status, geminiNote: geminiItem.note || '' };
 }
 
 function StatusIcon({ status }: { status: string }) {
@@ -64,10 +155,11 @@ function StatusIcon({ status }: { status: string }) {
     return <MinusCircle size={16} color="var(--text-muted)" />;
 }
 
-function ContentSection({ title, items, onAccept }: {
+function ContentSection({ title, items, onAccept, geminiItems }: {
     title: string;
     items: AICheckItem[];
     onAccept: (id: string) => void;
+    geminiItems?: AICheckItem[];
 }) {
     const [expanded, setExpanded] = useState(true);
 
@@ -97,66 +189,121 @@ function ContentSection({ title, items, onAccept }: {
                 {expanded ? <ChevronUp size={14} color="var(--text-muted)" /> : <ChevronDown size={14} color="var(--text-muted)" />}
             </button>
 
-            {expanded && items.map(item => (
-                <div
-                    key={item.id}
-                    className={`result-item ${item.accepted ? 'accepted' : item.status}`}
-                    style={{ marginBottom: '4px' }}
-                >
-                    <StatusIcon status={item.accepted ? 'skipped' : item.status} />
-                    <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <div>
-                                <div style={{ fontSize: '13px', fontWeight: 600, color: item.accepted ? 'var(--text-muted)' : 'var(--text-primary)' }}>
-                                    {item.field}
-                                    {item.accepted && <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--accent-orange)' }}>(Đã chấp nhận)</span>}
-                                </div>
-                                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' }}>
-                                    <span style={{ color: 'var(--text-muted)' }}>Quy định: </span>{item.expected}
-                                </div>
-                                {item.found && (
-                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                        <span style={{ color: 'var(--text-muted)' }}>Tìm thấy: </span>{item.found}
+            {expanded && items.map(item => {
+                const disagreement = geminiItems && geminiItems.length > 0
+                    ? getDisagreement(item.id, items, geminiItems)
+                    : null;
+                const geminiItem = geminiItems?.find(g => g.id === item.id);
+
+                return (
+                    <div
+                        key={item.id}
+                        className={`result-item ${item.accepted ? 'accepted' : item.status}`}
+                        style={{
+                            marginBottom: '4px',
+                            borderLeft: disagreement?.hasDisagreement ? '3px solid #F59E0B' : undefined,
+                        }}
+                    >
+                        <StatusIcon status={item.accepted ? 'skipped' : item.status} />
+                        <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div>
+                                    <div style={{ fontSize: '13px', fontWeight: 600, color: item.accepted ? 'var(--text-muted)' : 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        {item.field}
+                                        {item.accepted && <span style={{ fontSize: '11px', color: 'var(--accent-orange)' }}>(Đã chấp nhận)</span>}
+                                        {disagreement?.hasDisagreement && (
+                                            <span style={{
+                                                fontSize: '10px',
+                                                padding: '1px 6px',
+                                                borderRadius: '4px',
+                                                background: 'rgba(245, 158, 11, 0.15)',
+                                                color: '#F59E0B',
+                                                fontWeight: 700,
+                                            }}>
+                                                ⚡ Bất đồng
+                                            </span>
+                                        )}
                                     </div>
-                                )}
-                                {item.note && !item.accepted && (
-                                    <div style={{
-                                        fontSize: '12px',
-                                        color: item.status === 'error' ? 'var(--accent-red)' : 'var(--accent-yellow)',
-                                        marginTop: '4px',
-                                        display: 'flex',
-                                        alignItems: 'flex-start',
-                                        gap: '4px',
-                                    }}>
-                                        <Info size={12} style={{ marginTop: '1px', flexShrink: 0 }} />
-                                        {item.note}
+                                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '3px' }}>
+                                        <span style={{ color: 'var(--text-muted)' }}>Quy định: </span>{item.expected}
                                     </div>
+                                    {item.found && (
+                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                            <span style={{ color: 'var(--text-muted)' }}>Tìm thấy: </span>
+                                            {item.status === 'error' && item.expected ? highlightDiff(item.expected, item.found) : item.found}
+                                        </div>
+                                    )}
+                                    {item.note && !item.accepted && (
+                                        <div style={{
+                                            fontSize: '12px',
+                                            color: item.status === 'error' ? 'var(--accent-red)' : 'var(--accent-yellow)',
+                                            marginTop: '4px',
+                                        }}>
+                                            <span style={{ fontSize: '10px', color: 'var(--accent-orange)', fontWeight: 600 }}>🟠 GPT: </span>
+                                            {renderNote(item.note, item.status)}
+                                        </div>
+                                    )}
+                                    {/* Show Gemini's opinion if it disagrees */}
+                                    {disagreement?.hasDisagreement && geminiItem && (
+                                        <div style={{
+                                            fontSize: '12px',
+                                            marginTop: '6px',
+                                            padding: '6px 10px',
+                                            background: 'rgba(66, 133, 244, 0.06)',
+                                            borderRadius: '6px',
+                                            border: '1px solid rgba(66, 133, 244, 0.15)',
+                                        }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '3px' }}>
+                                                <span style={{ fontSize: '10px', color: '#4285F4', fontWeight: 700 }}>🔵 Gemini:</span>
+                                                <span style={{
+                                                    fontSize: '10px',
+                                                    padding: '1px 6px',
+                                                    borderRadius: '3px',
+                                                    fontWeight: 600,
+                                                    background: geminiItem.status === 'ok' ? 'var(--accent-green-glow)' : geminiItem.status === 'error' ? 'var(--accent-red-glow)' : 'var(--accent-yellow-glow)',
+                                                    color: geminiItem.status === 'ok' ? 'var(--accent-green)' : geminiItem.status === 'error' ? 'var(--accent-red)' : 'var(--accent-yellow)',
+                                                }}>
+                                                    {geminiItem.status === 'ok' ? '✅ OK' : geminiItem.status === 'error' ? '❌ Lỗi' : '⚠ Cảnh báo'}
+                                                </span>
+                                            </div>
+                                            {geminiItem.found && (
+                                                <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                                    <span style={{ color: 'var(--text-muted)' }}>Tìm thấy: </span>{geminiItem.found}
+                                                </div>
+                                            )}
+                                            {geminiItem.note && (
+                                                <div style={{ color: '#4285F4', marginTop: '2px' }}>
+                                                    {geminiItem.note}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                                {(item.status === 'error' || item.status === 'warning') && !item.accepted && (
+                                    <button
+                                        onClick={() => onAccept(item.id)}
+                                        style={{
+                                            padding: '4px 12px',
+                                            background: 'rgba(234, 88, 12, 0.1)',
+                                            border: '1px solid rgba(234, 88, 12, 0.3)',
+                                            borderRadius: '6px',
+                                            color: 'var(--accent-orange)',
+                                            fontSize: '12px',
+                                            fontWeight: 600,
+                                            cursor: 'pointer',
+                                            whiteSpace: 'nowrap',
+                                            marginLeft: '12px',
+                                            flexShrink: 0,
+                                        }}
+                                    >
+                                        Accept
+                                    </button>
                                 )}
                             </div>
-                            {(item.status === 'error' || item.status === 'warning') && !item.accepted && (
-                                <button
-                                    onClick={() => onAccept(item.id)}
-                                    style={{
-                                        padding: '4px 12px',
-                                        background: 'rgba(234, 88, 12, 0.1)',
-                                        border: '1px solid rgba(234, 88, 12, 0.3)',
-                                        borderRadius: '6px',
-                                        color: 'var(--accent-orange)',
-                                        fontSize: '12px',
-                                        fontWeight: 600,
-                                        cursor: 'pointer',
-                                        whiteSpace: 'nowrap',
-                                        marginLeft: '12px',
-                                        flexShrink: 0,
-                                    }}
-                                >
-                                    Accept
-                                </button>
-                            )}
                         </div>
                     </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
@@ -165,6 +312,8 @@ export default function ResultPage() {
     const router = useRouter();
     const [payload, setPayload] = useState<ResultPayload | null>(null);
     const [items, setItems] = useState<AICheckItem[]>([]);
+    const [geminiItems, setGeminiItems] = useState<AICheckItem[]>([]);
+    const hasGemini = geminiItems.length > 0;
 
     useEffect(() => {
         const raw = sessionStorage.getItem('labelcheck_result');
@@ -175,7 +324,12 @@ export default function ResultPage() {
         try {
             const data: ResultPayload = JSON.parse(raw);
             setPayload(data);
-            setItems(data.aiResult.items || []);
+            // GPT items (primary)
+            const gptItems = data.aiResult?.items || [];
+            setItems(gptItems);
+            // Gemini items (secondary)
+            const gItems = data.geminiResult?.items || [];
+            setGeminiItems(gItems);
         } catch {
             router.push('/check');
         }
@@ -238,19 +392,34 @@ export default function ResultPage() {
                 </Link>
 
                 <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         {payload.productName}
-                        <span style={{
-                            fontSize: '10px',
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                            background: 'var(--accent-orange-glow)',
-                            color: 'var(--accent-orange)',
-                            fontWeight: 700,
-                        }}>
-                            <Bot size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '2px' }} />
-                            GPT-4o
-                        </span>
+                        {payload.aiResult && (
+                            <span style={{
+                                fontSize: '10px',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                background: 'var(--accent-orange-glow)',
+                                color: 'var(--accent-orange)',
+                                fontWeight: 700,
+                            }}>
+                                <Bot size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '2px' }} />
+                                GPT-4o
+                            </span>
+                        )}
+                        {hasGemini && (
+                            <span style={{
+                                fontSize: '10px',
+                                padding: '2px 8px',
+                                borderRadius: '4px',
+                                background: 'rgba(66, 133, 244, 0.1)',
+                                color: '#4285F4',
+                                fontWeight: 700,
+                            }}>
+                                <Bot size={10} style={{ display: 'inline', verticalAlign: 'middle', marginRight: '2px' }} />
+                                Gemini
+                            </span>
+                        )}
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                         {payload.brandName} · {payload.labelType} · {payload.volumeFormatted}
@@ -285,35 +454,35 @@ export default function ResultPage() {
                     background: 'var(--bg-secondary)',
                 }}>
                     <div style={{ flex: 1, padding: '20px', overflow: 'auto' }}>
-                        {payload.labelFileUrl ? (
-                            <div style={{
-                                borderRadius: '12px',
-                                overflow: 'hidden',
-                                border: '1px solid var(--border)',
-                                background: '#fff',
-                            }}>
-                                <img
-                                    src={payload.labelFileUrl}
-                                    alt="Nhãn sản phẩm"
-                                    style={{ width: '100%', height: 'auto', display: 'block' }}
-                                />
+                        {/* Label + HSCB Side by Side */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+                            <div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>Nhãn sản phẩm</div>
+                                {payload.labelFileUrl ? (
+                                    <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)', background: '#fff' }}>
+                                        <img src={payload.labelFileUrl} alt="Nhãn sản phẩm" style={{ width: '100%', height: 'auto', display: 'block', cursor: 'pointer', maxHeight: '280px', objectFit: 'contain' }}
+                                            onClick={() => window.open(payload.labelFileUrl!, '_blank')} />
+                                    </div>
+                                ) : (
+                                    <div style={{ height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9f9f9', borderRadius: '8px', border: '1px dashed var(--border-light)', color: 'var(--text-muted)', fontSize: '12px' }}>
+                                        <FileText size={32} style={{ opacity: 0.3 }} />
+                                    </div>
+                                )}
                             </div>
-                        ) : (
-                            <div style={{
-                                height: '300px',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                background: 'var(--bg-primary)',
-                                borderRadius: '12px',
-                                border: '1px dashed var(--border-light)',
-                                color: 'var(--text-muted)',
-                            }}>
-                                <FileText size={48} style={{ marginBottom: '16px', opacity: 0.3 }} />
-                                <div>Không có ảnh preview</div>
+                            <div>
+                                <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '6px', fontWeight: 600 }}>Hồ sơ công bố (HSCB)</div>
+                                {payload.hscbFileUrl ? (
+                                    <div style={{ borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)', background: '#fff' }}>
+                                        <img src={payload.hscbFileUrl} alt="HSCB" style={{ width: '100%', height: 'auto', display: 'block', cursor: 'pointer', maxHeight: '280px', objectFit: 'contain' }}
+                                            onClick={() => window.open(payload.hscbFileUrl!, '_blank')} />
+                                    </div>
+                                ) : (
+                                    <div style={{ height: '150px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9f9f9', borderRadius: '8px', border: '1px dashed var(--border-light)', color: 'var(--text-muted)', fontSize: '12px' }}>
+                                        HSCB: Không có
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </div>
 
                         {/* AI Summary Card */}
                         {aiResult.summary && (
@@ -415,7 +584,8 @@ export default function ResultPage() {
                         </div>
                         <div style={{ fontSize: '12px', color: 'var(--text-secondary)', lineHeight: 1.8 }}>
                             <div>📅 {new Date(payload.createdAt).toLocaleString('vi-VN')}</div>
-                            <div>🤖 Model: GPT-4o Vision</div>
+                            <div>🤖 GPT-4o {payload.aiResult ? '✅' : '❌'}</div>
+                            <div>🤖 Gemini {hasGemini ? '✅' : '❌'}</div>
                             {payload.usage && (
                                 <div>📊 Tokens: {payload.usage.total_tokens.toLocaleString()}</div>
                             )}
@@ -463,6 +633,37 @@ export default function ResultPage() {
                     </div>
 
                     <div style={{ flex: 1, overflow: 'auto', padding: '24px' }}>
+                        {/* Disagreement summary banner */}
+                        {hasGemini && (() => {
+                            const disagreements = items.filter(item => {
+                                const d = getDisagreement(item.id, items, geminiItems);
+                                return d.hasDisagreement;
+                            });
+                            if (disagreements.length === 0) return null;
+                            return (
+                                <div style={{
+                                    padding: '12px 16px',
+                                    background: 'rgba(245, 158, 11, 0.08)',
+                                    borderRadius: '10px',
+                                    border: '1px solid rgba(245, 158, 11, 0.3)',
+                                    marginBottom: '16px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                }}>
+                                    <span style={{ fontSize: '16px' }}>⚡</span>
+                                    <div>
+                                        <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--accent-yellow)' }}>
+                                            {disagreements.length} mục bất đồng giữa GPT-4o và Gemini
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                            Các mục có icon ⚡ cần xem lại thủ công vì 2 AI đưa ra kết quả khác nhau
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
                         <div style={{
                             padding: '12px 16px',
                             background: 'var(--accent-orange-glow)',
@@ -477,7 +678,7 @@ export default function ResultPage() {
                             marginBottom: '20px',
                         }}>
                             <Bot size={16} />
-                            Kết quả phân tích bởi GPT-4o Vision — {items.length} mục đã kiểm tra
+                            Kết quả phân tích{hasGemini ? ' bởi GPT-4o + Gemini' : ' bởi GPT-4o Vision'} — {items.length} mục đã kiểm tra
                         </div>
 
                         {/* Stats cards */}
@@ -520,30 +721,30 @@ export default function ResultPage() {
                             </div>
                         </div>
 
-                        {/* Error items first */}
                         {items.filter(i => i.status === 'error').length > 0 && (
                             <ContentSection
                                 title="❌ Lỗi cần sửa"
                                 items={items.filter(i => i.status === 'error')}
                                 onAccept={handleAccept}
+                                geminiItems={geminiItems}
                             />
                         )}
 
-                        {/* Warning items */}
                         {items.filter(i => i.status === 'warning').length > 0 && (
                             <ContentSection
                                 title="⚠️ Cảnh báo"
                                 items={items.filter(i => i.status === 'warning')}
                                 onAccept={handleAccept}
+                                geminiItems={geminiItems}
                             />
                         )}
 
-                        {/* OK items */}
                         {items.filter(i => i.status === 'ok').length > 0 && (
                             <ContentSection
                                 title="✅ Đạt chuẩn"
                                 items={items.filter(i => i.status === 'ok')}
                                 onAccept={handleAccept}
+                                geminiItems={geminiItems}
                             />
                         )}
 

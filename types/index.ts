@@ -75,4 +75,5 @@ export interface CheckFormData {
     labelFile: File | null;
     hscbFile: File | null;
     barcodeFile: File | null;
+    barcodeRef: string; // Số mã vạch gốc nhập tay (chính xác 100%)
 }

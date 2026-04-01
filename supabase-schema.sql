@@ -20,6 +20,41 @@ create policy "Enable insert for all users" on public.brands for insert with che
 create policy "Enable update for all users" on public.brands for update using (true);
 create policy "Enable delete for all users" on public.brands for delete using (true);
 
+-- =============================================
+-- Create check_sessions table
+-- =============================================
+create table public.check_sessions (
+  id text primary key,
+  product_name text not null,
+  brand_id text,
+  brand_name text,
+  label_type text,
+  volume text,
+  volume_formatted text,
+  status text not null default 'fail',
+  created_at timestamptz not null default now(),
+  checked_by text,
+  total_errors int default 0,
+  total_warnings int default 0,
+  total_ok int default 0,
+  ai_result jsonb,
+  content_items jsonb,
+  label_file_url text,
+  hscb_file_url text,
+  barcode_file_url text,
+  barcode_result jsonb
+);
+
+-- Enable Row Level Security
+alter table public.check_sessions enable row level security;
+
+-- Create policies for anonymous access (MVP demo)
+create policy "Enable read for all users" on public.check_sessions for select using (true);
+create policy "Enable insert for all users" on public.check_sessions for insert with check (true);
+create policy "Enable update for all users" on public.check_sessions for update using (true);
+create policy "Enable delete for all users" on public.check_sessions for delete using (true);
+
+-- =============================================
 -- Insert Mock Data
 insert into public.brands (id, name, logo_url, qr_code_url, registered_company_name, address, phone, website, color)
 values

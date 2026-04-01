@@ -99,11 +99,67 @@ export function getCheckSessions(): SavedCheckSession[] {
 }
 
 /**
- * Get a single check session by ID
+ * Get a single check session by ID (localStorage first, then Supabase)
  */
 export function getCheckSessionById(id: string): SavedCheckSession | null {
   const sessions = getCheckSessions();
   return sessions.find(s => s.id === id) || null;
+}
+
+/**
+ * Get a single check session by ID from Supabase
+ */
+export async function getCheckSessionByIdFromSupabase(id: string): Promise<SavedCheckSession | null> {
+  try {
+    const { data, error } = await supabase
+      .from('check_sessions')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error || !data) return null;
+    return mapSupabaseRow(data);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get all check sessions from Supabase
+ */
+export async function getCheckSessionsFromSupabase(): Promise<SavedCheckSession[]> {
+  try {
+    const { data, error } = await supabase
+      .from('check_sessions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error || !data) return [];
+    return data.map(mapSupabaseRow);
+  } catch {
+    return [];
+  }
+}
+
+function mapSupabaseRow(row: Record<string, unknown>): SavedCheckSession {
+  return {
+    id: row.id as string,
+    productName: row.product_name as string,
+    brandId: row.brand_id as string,
+    brandName: row.brand_name as string,
+    labelType: row.label_type as '>20ml' | '<20ml',
+    volume: row.volume as string,
+    volumeFormatted: row.volume_formatted as string,
+    status: row.status as 'pass' | 'fail' | 'warning',
+    createdAt: row.created_at as string,
+    checkedBy: row.checked_by as string || 'GPT-4o Vision',
+    totalErrors: row.total_errors as number || 0,
+    totalWarnings: row.total_warnings as number || 0,
+    totalOk: row.total_ok as number || 0,
+    aiResult: row.ai_result as Record<string, unknown> || {},
+    labelFileUrl: row.label_file_url as string,
+    hscbFileUrl: row.hscb_file_url as string,
+    barcodeFileUrl: row.barcode_file_url as string,
+  };
 }
 
 /**
